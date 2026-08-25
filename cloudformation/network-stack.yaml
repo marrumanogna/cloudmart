@@ -95,6 +95,7 @@ Resources:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
+
       Tags:
         - Key: Name
           Value: !Sub cloudmart-private-rt-${Environment}
@@ -111,6 +112,7 @@ Resources:
       SubnetId: !Ref PrivateSubnet2
       RouteTableId: !Ref PrivateRouteTable
 
+  # Lambda Security Group
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -129,6 +131,7 @@ Resources:
         - Key: Name
           Value: !Sub sg-lambda-${Environment}
 
+  # RDS Security Group
   RdsSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -138,6 +141,7 @@ Resources:
         - Key: Name
           Value: !Sub sg-rds-${Environment}
 
+  # RDS allows MySQL only from Lambda
   RdsIngressFromLambda:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -147,32 +151,55 @@ Resources:
       ToPort: 3306
       SourceSecurityGroupId: !Ref LambdaSecurityGroup
 
+  # Dashboard Security Group
   Ec2DashboardSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Security group for CloudMart dashboard
       VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          CidrIp: 10.0.0.0/16
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 10.0.0.0/16
       Tags:
         - Key: Name
           Value: !Sub sg-ec2-dashboard-${Environment}
+
+  # Dashboard HTTP
+  Ec2IngressHttp:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref Ec2DashboardSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+
+  # Dashboard HTTPS
+  Ec2IngressHttps:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref Ec2DashboardSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+
+  # Dashboard to RDS
+  Ec2EgressRds:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref Ec2DashboardSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      DestinationSecurityGroupId: !Ref RdsSecurityGroup
+
+  # Dashboard HTTPS outbound
+  Ec2EgressHttps:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref Ec2DashboardSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 10.0.0.0/16
 
 Outputs:
 
