@@ -15,7 +15,7 @@ Parameters:
   DBUsername:
     Type: String
     Default: cloudmartadmin
-
+0
   DBPassword:
     Type: String
     NoEcho: true
