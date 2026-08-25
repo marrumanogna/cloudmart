@@ -1,1 +1,103 @@
+AWSTemplateFormatVersion: '2010-09-09'
 
+Description: CloudMart Data Stack
+
+Parameters:
+
+  Environment:
+    Type: String
+    Default: dev
+
+  DBUsername:
+    Type: String
+    NoEcho: true
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+
+  RdsSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: CloudMart RDS subnet group
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub CloudMart-${Environment}-PrivateSubnetId
+      Tags:
+        - Key: Name
+          Value: !Sub cloudmart-rds-subnet-group-${Environment}
+
+  RdsInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub cloudmart-mysql-${Environment}
+      Engine: mysql
+      EngineVersion: '8.0'
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      StorageType: gp2
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBName: cloudmart
+      Port: 3306
+      PubliclyAccessible: false
+      MultiAZ: false
+      DBSubnetGroupName: !Ref RdsSubnetGroup
+      VPCSecurityGroups:
+        - Fn::ImportValue:
+            !Sub CloudMart-${Environment}-RdsSecurityGroupId
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      Tags:
+        - Key: Name
+          Value: !Sub cloudmart-rds-${Environment}
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: !Sub cloudmart-artifacts-${Environment}
+
+  ReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: !Sub cloudmart-reports-${Environment}
+
+Outputs:
+
+  RdsEndpoint:
+    Value: !GetAtt RdsInstance.Endpoint.Address
+    Export:
+      Name: !Sub CloudMart-${Environment}-RdsEndpoint
+
+  RdsPort:
+    Value: !GetAtt RdsInstance.Endpoint.Port
+    Export:
+      Name: !Sub CloudMart-${Environment}-RdsPort
+
+  ArtifactsBucketName:
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: !Sub CloudMart-${Environment}-ArtifactsBucketName
+
+  ReportsBucketName:
+    Value: !Ref ReportsBucket
+    Export:
+      Name: !Sub CloudMart-${Environment}-ReportsBucketName

@@ -1,75 +1,71 @@
-name: Deploy CloudMart Network
+name: CloudMart Infrastructure Deployment
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'cloudformation/**'
+      - '.github/workflows/deploy.yaml'
 
   workflow_dispatch:
 
 permissions:
-  contents: read
   id-token: write
+  contents: read
 
 env:
   AWS_REGION: ap-south-1
-  STACK_NAME: cloudmart-network-dev
+  ENVIRONMENT: dev
 
 jobs:
 
-  deploy:
-
+  deploy-network:
+    name: Deploy Network Stack
     runs-on: ubuntu-latest
 
     steps:
 
-      # 1. Get code from GitHub
-      - name: Get Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Connect GitHub to AWS
-      - name: Login to AWS
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3. Check AWS connection
-      - name: Check AWS
-        run: aws sts get-caller-identity
-
-      # 4. Check CloudFormation file
-      - name: Validate Template
-        run: |
-          aws cloudformation validate-template \
-            --template-body file://cloudformation/network-stack.yaml
-
-      # 5. Deploy infrastructure
-      - name: Deploy Network
+      - name: Deploy Network Stack
         run: |
           aws cloudformation deploy \
             --template-file cloudformation/network-stack.yaml \
-            --stack-name $STACK_NAME \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
+            --parameter-overrides Environment=${{ env.ENVIRONMENT }} \
+            --capabilities CAPABILITY_NAMED_IAM
+
+  deploy-data:
+    name: Deploy Data Stack
+    needs: deploy-network
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Data Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/data-stack.yaml \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=dev \
-              AvailabilityZone=ap-south-1a \
-              VpcCidr=10.0.0.0/16 \
-              PublicSubnetCidr=10.0.1.0/24 \
-              PrivateSubnetCidr=10.0.2.0/24 \
-              AdminCidr=${{ secrets.ADMIN_CIDR }}
-
-      # 6. Check deployment result
-      - name: Check Stack
-        run: |
-          aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].[StackName,StackStatus]' \
-            --output table
-
-      # 7. Show outputs
-      - name: Show Outputs
-        run: |
-          aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs' \
-            --output table
+              Environment=${{ env.ENVIRONMENT }} \
+              DBUsername=${{ secrets.DB_USERNAME }} \
+              DBPassword=${{ secrets.DB_PASSWORD }} \
+            --capabilities CAPABILITY_NAMED_IAM
