@@ -116,14 +116,18 @@ Resources:
     Properties:
       GroupDescription: Security group for CloudMart RDS
       VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          SourceSecurityGroupId: !Ref LambdaSecurityGroup
       Tags:
         - Key: Name
           Value: !Sub sg-rds-${Environment}
+
+  RdsIngressFromLambda:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      SourceSecurityGroupId: !Ref LambdaSecurityGroup
 
   Ec2DashboardSecurityGroup:
     Type: AWS::EC2::SecurityGroup
