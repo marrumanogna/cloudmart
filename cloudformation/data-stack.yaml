@@ -3,14 +3,17 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudMart Data Stack
 
 Parameters:
-
   Environment:
     Type: String
     Default: dev
 
+  DBName:
+    Type: String
+    Default: cloudmart
+
   DBUsername:
     Type: String
-    NoEcho: true
+    Default: cloudmartadmin
 
   DBPassword:
     Type: String
@@ -25,22 +28,23 @@ Resources:
       SubnetIds:
         - Fn::ImportValue:
             !Sub CloudMart-${Environment}-PrivateSubnetId
+        - Fn::ImportValue:
+            !Sub CloudMart-${Environment}-PrivateSubnet2Id
       Tags:
         - Key: Name
           Value: !Sub cloudmart-rds-subnet-group-${Environment}
 
-  RdsInstance:
+  CloudMartRDS:
     Type: AWS::RDS::DBInstance
     Properties:
       DBInstanceIdentifier: !Sub cloudmart-mysql-${Environment}
       Engine: mysql
-      EngineVersion: '8.0'
-      DBInstanceClass: db.t3.micro
-      AllocatedStorage: 20
-      StorageType: gp2
+      DBName: !Ref DBName
       MasterUsername: !Ref DBUsername
       MasterUserPassword: !Ref DBPassword
-      DBName: cloudmart
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      StorageType: gp3
       Port: 3306
       PubliclyAccessible: false
       MultiAZ: false
@@ -50,6 +54,7 @@ Resources:
             !Sub CloudMart-${Environment}-RdsSecurityGroupId
       BackupRetentionPeriod: 1
       DeletionProtection: false
+      DeleteAutomatedBackups: true
       Tags:
         - Key: Name
           Value: !Sub cloudmart-rds-${Environment}
@@ -61,8 +66,11 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
-      VersioningConfiguration:
-        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       Tags:
         - Key: Name
           Value: !Sub cloudmart-artifacts-${Environment}
@@ -74,8 +82,11 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
-      VersioningConfiguration:
-        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       Tags:
         - Key: Name
           Value: !Sub cloudmart-reports-${Environment}
@@ -83,12 +94,12 @@ Resources:
 Outputs:
 
   RdsEndpoint:
-    Value: !GetAtt RdsInstance.Endpoint.Address
+    Value: !GetAtt CloudMartRDS.Endpoint.Address
     Export:
       Name: !Sub CloudMart-${Environment}-RdsEndpoint
 
   RdsPort:
-    Value: !GetAtt RdsInstance.Endpoint.Port
+    Value: !GetAtt CloudMartRDS.Endpoint.Port
     Export:
       Name: !Sub CloudMart-${Environment}-RdsPort
 
