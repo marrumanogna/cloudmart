@@ -3,6 +3,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudMart Data Stack
 
 Parameters:
+
   Environment:
     Type: String
     Default: dev
@@ -39,6 +40,7 @@ Resources:
     Properties:
       DBInstanceIdentifier: !Sub cloudmart-mysql-${Environment}
       Engine: mysql
+      EngineVersion: '8.0'
       DBName: !Ref DBName
       MasterUsername: !Ref DBUsername
       MasterUserPassword: !Ref DBPassword
@@ -55,6 +57,7 @@ Resources:
       BackupRetentionPeriod: 1
       DeletionProtection: false
       DeleteAutomatedBackups: true
+      AutoMinorVersionUpgrade: true
       Tags:
         - Key: Name
           Value: !Sub cloudmart-rds-${Environment}
@@ -94,21 +97,25 @@ Resources:
 Outputs:
 
   RdsEndpoint:
+    Description: RDS MySQL endpoint
     Value: !GetAtt CloudMartRDS.Endpoint.Address
     Export:
       Name: !Sub CloudMart-${Environment}-RdsEndpoint
 
   RdsPort:
+    Description: RDS MySQL port
     Value: !GetAtt CloudMartRDS.Endpoint.Port
     Export:
       Name: !Sub CloudMart-${Environment}-RdsPort
 
   ArtifactsBucketName:
+    Description: S3 artifacts bucket
     Value: !Ref ArtifactsBucket
     Export:
       Name: !Sub CloudMart-${Environment}-ArtifactsBucketName
 
   ReportsBucketName:
+    Description: S3 reports bucket
     Value: !Ref ReportsBucket
     Export:
       Name: !Sub CloudMart-${Environment}-ReportsBucketName
