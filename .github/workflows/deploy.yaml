@@ -20,10 +20,6 @@ env:
 
 jobs:
 
-  # ==========================================================
-  # NETWORK
-  # ==========================================================
-
   deploy-network:
     name: Deploy Network Stack
     runs-on: ubuntu-latest
@@ -38,6 +34,11 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Validate Network Template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/network-stack.yaml
+
       - name: Deploy Network Stack
         run: |
           aws cloudformation deploy \
@@ -47,9 +48,6 @@ jobs:
               Environment=${{ env.ENVIRONMENT }} \
             --capabilities CAPABILITY_NAMED_IAM
 
-  # ==========================================================
-  # DATA
-  # ==========================================================
 
   deploy-data:
     name: Deploy Data Stack
@@ -66,6 +64,11 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Validate Data Template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/data-stack.yaml
+
       - name: Deploy Data Stack
         run: |
           aws cloudformation deploy \
@@ -73,13 +76,60 @@ jobs:
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
-              DBUsername=${{ secrets.DB_USERNAME }} \
-              DBPassword=${{ secrets.DB_PASSWORD }} \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
             --capabilities CAPABILITY_NAMED_IAM
 
-  # ==========================================================
-  # AUTH
-  # ==========================================================
+      - name: Store Database Parameters in SSM
+        env:
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          RDS_HOST=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='RdsEndpoint'].OutputValue" \
+            --output text)
+
+          RDS_PORT=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='RdsPort'].OutputValue" \
+            --output text)
+
+          DB_NAME=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='DBName'].OutputValue" \
+            --output text)
+
+          aws ssm put-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/rds/host" \
+            --type "String" \
+            --value "$RDS_HOST" \
+            --overwrite
+
+          aws ssm put-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/rds/port" \
+            --type "String" \
+            --value "$RDS_PORT" \
+            --overwrite
+
+          aws ssm put-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/rds/db-name" \
+            --type "String" \
+            --value "$DB_NAME" \
+            --overwrite
+
+          aws ssm put-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/rds/username" \
+            --type "SecureString" \
+            --value "$DB_USERNAME" \
+            --overwrite
+
+          aws ssm put-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/rds/password" \
+            --type "SecureString" \
+            --value "$DB_PASSWORD" \
+            --overwrite
+
 
   deploy-auth:
     name: Deploy Auth Stack
@@ -103,7 +153,15 @@ jobs:
             exit 1
           fi
 
-          echo "CLOUDMART_AUTH_TOKEN secret found"
+      - name: Store Auth Token in SSM
+        env:
+          AUTH_TOKEN: ${{ secrets.CLOUDMART_AUTH_TOKEN }}
+        run: |
+          aws ssm put-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/auth/api-token" \
+            --type "SecureString" \
+            --value "$AUTH_TOKEN" \
+            --overwrite
 
       - name: Validate Auth Template
         run: |
@@ -114,8 +172,8 @@ jobs:
         run: |
           aws cloudformation deploy \
             --template-file cloudformation/auth-stack.yaml \
-            --stack-name cloudmart-auth-dev \
+            --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=dev \
-              AuthToken="${{ secrets.CLOUDMART_AUTH_TOKEN }}" \
+              Environment=${{ env.ENVIRONMENT }} \
+              AuthTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/api-token" \
             --capabilities CAPABILITY_NAMED_IAM

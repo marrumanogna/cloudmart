@@ -2,6 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudMart Authentication Stack
 
 Parameters:
+
   Environment:
     Type: String
     Default: dev
@@ -9,31 +10,17 @@ Parameters:
       - dev
       - prod
 
-  AuthToken:
+  AuthTokenParameterName:
     Type: String
-    NoEcho: true
-    MinLength: 1
-    Description: Authentication token used by the Lambda Authorizer
+    Description: Name of the SecureString SSM parameter containing the API token
+    Default: /cloudmart/dev/auth/api-token
 
 Resources:
-
-  AuthTokenParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/auth/api-token
-      Type: SecureString
-      Value: !Ref AuthToken
-      Description: CloudMart API authentication token
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: CloudMart
 
   AuthorizerRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub CloudMart-Authorizer-Role-${Environment}
+      RoleName: !Sub cloudmart-authorizer-role-${Environment}
 
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -46,6 +33,7 @@ Resources:
               - sts:AssumeRole
 
       Policies:
+
         - PolicyName: AuthorizerSSMAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -53,8 +41,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - ssm:GetParameter
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/api-token
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/api-token
 
         - PolicyName: AuthorizerCloudWatchLogs
           PolicyDocument:
@@ -65,14 +52,13 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource:
-                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-authorizer-${Environment}:*
+                Resource: '*'
 
   AuthorizerFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub cloudmart-authorizer-${Environment}
-      Runtime: python3.12
+      Runtime: python3.11
       Handler: index.lambda_handler
       Role: !GetAtt AuthorizerRole.Arn
       Timeout: 10
@@ -80,7 +66,7 @@ Resources:
 
       Environment:
         Variables:
-          AUTH_TOKEN_PARAMETER: !Ref AuthTokenParameter
+          AUTH_TOKEN_PARAMETER: !Ref AuthTokenParameterName
 
       Code:
         ZipFile: |
@@ -89,64 +75,68 @@ Resources:
 
           ssm = boto3.client("ssm")
 
+          PARAMETER_NAME = os.environ["AUTH_TOKEN_PARAMETER"]
+
+
+          def get_auth_token():
+              response = ssm.get_parameter(
+                  Name=PARAMETER_NAME,
+                  WithDecryption=True
+              )
+              return response["Parameter"]["Value"]
+
+
+          def generate_policy(principal_id, effect, resource):
+              return {
+                  "principalId": principal_id,
+                  "policyDocument": {
+                      "Version": "2012-10-17",
+                      "Statement": [
+                          {
+                              "Action": "execute-api:Invoke",
+                              "Effect": effect,
+                              "Resource": resource
+                          }
+                      ]
+                  }
+              }
+
+
           def lambda_handler(event, context):
-              try:
-                  token_parameter = os.environ["AUTH_TOKEN_PARAMETER"]
 
-                  response = ssm.get_parameter(
-                      Name=token_parameter,
-                      WithDecryption=True
-                  )
+              method_arn = event.get("methodArn", "*")
 
-                  expected_token = response["Parameter"]["Value"]
+              provided_token = event.get("authorizationToken", "")
 
+              if not provided_token:
                   headers = event.get("headers") or {}
+                  provided_token = headers.get("authorization", "")
 
-                  provided_token = (
-                      headers.get("Authorization")
-                      or headers.get("authorization")
+              if provided_token.lower().startswith("bearer "):
+                  provided_token = provided_token[7:].strip()
+
+              try:
+                  expected_token = get_auth_token()
+              except Exception as error:
+                  print(f"Failed to retrieve authentication token: {error}")
+                  return generate_policy(
+                      "cloudmart-unauthorized",
+                      "Deny",
+                      method_arn
                   )
 
-                  if provided_token and provided_token.startswith("Bearer "):
-                      provided_token = provided_token[7:]
+              if provided_token and provided_token == expected_token:
+                  return generate_policy(
+                      "cloudmart-user",
+                      "Allow",
+                      method_arn
+                  )
 
-                  effect = "Allow" if provided_token == expected_token else "Deny"
-
-                  return {
-                      "principalId": "cloudmart-user",
-                      "policyDocument": {
-                          "Version": "2012-10-17",
-                          "Statement": [
-                              {
-                                  "Action": "execute-api:Invoke",
-                                  "Effect": effect,
-                                  "Resource": event.get("methodArn", "*")
-                              }
-                          ]
-                      }
-                  }
-
-              except Exception as error:
-                  print(error)
-                  return {
-                      "principalId": "error",
-                      "policyDocument": {
-                          "Version": "2012-10-17",
-                          "Statement": [
-                              {
-                                  "Action": "execute-api:Invoke",
-                                  "Effect": "Deny",
-                                  "Resource": event.get("methodArn", "*")
-                              }
-                          ]
-                      }
-                  }
-
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: CloudMart
+              return generate_policy(
+                  "cloudmart-unauthorized",
+                  "Deny",
+                  method_arn
+              )
 
   AuthorizerLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -164,15 +154,13 @@ Outputs:
       Name: !Sub CloudMart-${Environment}-AuthorizerFunctionArn
 
   AuthorizerFunctionInvokeArn:
-    Description: CloudMart Lambda Authorizer Invoke ARN
-    Value: !Sub
-      - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerArn}/invocations
-      - AuthorizerArn: !GetAtt AuthorizerFunction.Arn
+    Description: API Gateway Lambda Authorizer invocation URI
+    Value: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
     Export:
       Name: !Sub CloudMart-${Environment}-AuthorizerFunctionInvokeArn
 
   AuthTokenParameterName:
-    Description: SSM parameter containing the CloudMart API token
-    Value: !Ref AuthTokenParameter
+    Description: SSM SecureString parameter containing the CloudMart API token
+    Value: !Ref AuthTokenParameterName
     Export:
       Name: !Sub CloudMart-${Environment}-AuthTokenParameterName

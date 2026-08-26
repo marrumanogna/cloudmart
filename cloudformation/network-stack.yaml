@@ -1,11 +1,13 @@
 AWSTemplateFormatVersion: '2010-09-09'
-
 Description: CloudMart Network Stack
 
 Parameters:
   Environment:
     Type: String
     Default: dev
+    AllowedValues:
+      - dev
+      - prod
 
 Resources:
 
@@ -111,7 +113,6 @@ Resources:
       SubnetId: !Ref PrivateSubnet2
       RouteTableId: !Ref PrivateRouteTable
 
-  # Lambda Security Group
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -121,7 +122,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          CidrIp: 10.0.0.0/16
+          DestinationSecurityGroupId: !Ref RdsSecurityGroup
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
@@ -130,7 +131,6 @@ Resources:
         - Key: Name
           Value: !Sub sg-lambda-${Environment}
 
-  # RDS Security Group
   RdsSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -140,7 +140,6 @@ Resources:
         - Key: Name
           Value: !Sub sg-rds-${Environment}
 
-  # RDS allows MySQL only from Lambda
   RdsIngressFromLambda:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -150,7 +149,6 @@ Resources:
       ToPort: 3306
       SourceSecurityGroupId: !Ref LambdaSecurityGroup
 
-  # Dashboard Security Group
   Ec2DashboardSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -160,7 +158,6 @@ Resources:
         - Key: Name
           Value: !Sub sg-ec2-dashboard-${Environment}
 
-  # Dashboard HTTP
   Ec2IngressHttp:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -170,7 +167,6 @@ Resources:
       ToPort: 80
       CidrIp: 0.0.0.0/0
 
-  # Dashboard HTTPS
   Ec2IngressHttps:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -180,7 +176,6 @@ Resources:
       ToPort: 443
       CidrIp: 0.0.0.0/0
 
-  # Dashboard to RDS
   Ec2EgressRds:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
@@ -190,7 +185,6 @@ Resources:
       ToPort: 3306
       DestinationSecurityGroupId: !Ref RdsSecurityGroup
 
-  # Dashboard HTTPS outbound
   Ec2EgressHttps:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
@@ -199,10 +193,6 @@ Resources:
       FromPort: 443
       ToPort: 443
       CidrIp: 10.0.0.0/16
-
-  # =========================================================
-  # VPC ENDPOINT SECURITY GROUP
-  # =========================================================
 
   VpcEndpointSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -222,10 +212,6 @@ Resources:
         - Key: Name
           Value: !Sub sg-vpc-endpoints-${Environment}
 
-  # =========================================================
-  # SSM INTERFACE VPC ENDPOINT
-  # =========================================================
-
   SsmVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -238,10 +224,6 @@ Resources:
         - !Ref PrivateSubnet2
       SecurityGroupIds:
         - !Ref VpcEndpointSecurityGroup
-
-  # =========================================================
-  # S3 GATEWAY VPC ENDPOINT
-  # =========================================================
 
   S3VpcEndpoint:
     Type: AWS::EC2::VPCEndpoint

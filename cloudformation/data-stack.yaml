@@ -1,5 +1,4 @@
 AWSTemplateFormatVersion: '2010-09-09'
-
 Description: CloudMart Data Stack
 
 Parameters:
@@ -7,6 +6,9 @@ Parameters:
   Environment:
     Type: String
     Default: dev
+    AllowedValues:
+      - dev
+      - prod
 
   DBName:
     Type: String
@@ -19,6 +21,7 @@ Parameters:
   DBPassword:
     Type: String
     NoEcho: true
+    MinLength: 8
 
 Resources:
 
@@ -113,3 +116,13 @@ Outputs:
     Value: !Ref ReportsBucket
     Export:
       Name: !Sub CloudMart-${Environment}-ReportsBucketName
+
+  DBName:
+    Value: !Ref DBName
+    Export:
+      Name: !Sub CloudMart-${Environment}-DBName
+
+  DBUsername:
+    Value: !Ref DBUsername
+    Export:
+      Name: !Sub CloudMart-${Environment}-DBUsername
