@@ -1,9 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
-
 Description: CloudMart Authentication Stack
 
 Parameters:
-
   Environment:
     Type: String
     Default: dev
@@ -19,10 +17,6 @@ Parameters:
 
 Resources:
 
-  # ------------------------------------------------------------
-  # SSM Parameter - Authentication Token
-  # ------------------------------------------------------------
-
   AuthTokenParameter:
     Type: AWS::SSM::Parameter
     Properties:
@@ -31,13 +25,10 @@ Resources:
       Value: !Ref AuthToken
       Description: CloudMart API authentication token
       Tags:
-        Environment: !Ref Environment
-        Application: CloudMart
-
-
-  # ------------------------------------------------------------
-  # Lambda Authorizer IAM Role
-  # ------------------------------------------------------------
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: CloudMart
 
   AuthorizerRole:
     Type: AWS::IAM::Role
@@ -55,7 +46,6 @@ Resources:
               - sts:AssumeRole
 
       Policies:
-
         - PolicyName: AuthorizerSSMAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -78,27 +68,19 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-authorizer-${Environment}:*
 
-  # ------------------------------------------------------------
-  # Lambda Authorizer
-  # ------------------------------------------------------------
-
   AuthorizerFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub cloudmart-authorizer-${Environment}
-
       Runtime: python3.12
       Handler: index.lambda_handler
-
       Role: !GetAtt AuthorizerRole.Arn
-
       Timeout: 10
       MemorySize: 128
 
       Environment:
         Variables:
-          AUTH_TOKEN_PARAMETER:
-            !Ref AuthTokenParameter
+          AUTH_TOKEN_PARAMETER: !Ref AuthTokenParameter
 
       Code:
         ZipFile: |
@@ -108,7 +90,6 @@ Resources:
           ssm = boto3.client("ssm")
 
           def lambda_handler(event, context):
-
               try:
                   token_parameter = os.environ["AUTH_TOKEN_PARAMETER"]
 
@@ -126,44 +107,10 @@ Resources:
                       or headers.get("authorization")
                   )
 
-                  if not provided_token:
-                      return {
-                          "principalId": "anonymous",
-                          "policyDocument": {
-                              "Version": "2012-10-17",
-                              "Statement": [
-                                  {
-                                      "Action": "execute-api:Invoke",
-                                      "Effect": "Deny",
-                                      "Resource": event.get(
-                                          "methodArn",
-                                          "*"
-                                      )
-                                  }
-                              ]
-                          }
-                      }
-
-                  if provided_token.startswith("Bearer "):
+                  if provided_token and provided_token.startswith("Bearer "):
                       provided_token = provided_token[7:]
 
-                  if provided_token != expected_token:
-                      return {
-                          "principalId": "unauthorized",
-                          "policyDocument": {
-                              "Version": "2012-10-17",
-                              "Statement": [
-                                  {
-                                      "Action": "execute-api:Invoke",
-                                      "Effect": "Deny",
-                                      "Resource": event.get(
-                                          "methodArn",
-                                          "*"
-                                      )
-                                  }
-                              ]
-                          }
-                      }
+                  effect = "Allow" if provided_token == expected_token else "Deny"
 
                   return {
                       "principalId": "cloudmart-user",
@@ -172,19 +119,15 @@ Resources:
                           "Statement": [
                               {
                                   "Action": "execute-api:Invoke",
-                                  "Effect": "Allow",
-                                  "Resource": event.get(
-                                      "methodArn",
-                                      "*"
-                                  )
+                                  "Effect": effect,
+                                  "Resource": event.get("methodArn", "*")
                               }
                           ]
                       }
                   }
 
               except Exception as error:
-                  print(f"Authorizer error: {error}")
-
+                  print(error)
                   return {
                       "principalId": "error",
                       "policyDocument": {
@@ -193,10 +136,7 @@ Resources:
                               {
                                   "Action": "execute-api:Invoke",
                                   "Effect": "Deny",
-                                  "Resource": event.get(
-                                      "methodArn",
-                                      "*"
-                                  )
+                                  "Resource": event.get("methodArn", "*")
                               }
                           ]
                       }
@@ -208,21 +148,12 @@ Resources:
         - Key: Application
           Value: CloudMart
 
-  # ------------------------------------------------------------
-  # Lambda Permission for API Gateway
-  # ------------------------------------------------------------
-
   AuthorizerLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref AuthorizerFunction
       Principal: apigateway.amazonaws.com
-
-
-# --------------------------------------------------------------
-# Outputs
-# --------------------------------------------------------------
 
 Outputs:
 
