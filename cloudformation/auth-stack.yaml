@@ -54,7 +54,7 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /cloudmart/${Environment}/auth/api-token
-      Type: SecureString
+      Type: String
       Value: !Ref AuthToken
       Description: CloudMart API authentication token
       Tags:
@@ -110,7 +110,7 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /cloudmart/${Environment}/rds/username
-      Type: SecureString
+      Type: String
       Value: !Ref DBUsername
       Description: CloudMart RDS username
       Tags:
@@ -123,7 +123,7 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /cloudmart/${Environment}/rds/password
-      Type: SecureString
+      Type: String
       Value: !Ref DBPassword
       Description: CloudMart RDS password
       Tags:
