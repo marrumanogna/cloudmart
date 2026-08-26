@@ -1,10 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: >
-  CloudMart Authentication, Application IAM Roles, GitHub Actions OIDC
-  Deployment Role, and SSM Parameter Store Stack.
-  Creates the Lambda Authorizer, five application IAM roles, GitHub Actions
-  deployment role, and required SSM configuration parameters.
+Description: CloudMart Data Stack
 
 # ============================================================
 # PARAMETERS
