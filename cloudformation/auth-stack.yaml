@@ -1,10 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: CloudMart Authentication, SSM Parameters, and Application IAM Roles
-
-# ============================================================
-# PARAMETERS
-# ============================================================
+Description: CloudMart Authentication Stack
 
 Parameters:
 
@@ -14,145 +10,39 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-    Description: CloudMart environment
-
-  DBUsername:
-    Type: String
-    NoEcho: true
-    MinLength: 1
-    Description: CloudMart RDS username
-
-  DBPassword:
-    Type: String
-    NoEcho: true
-    MinLength: 8
-    Description: CloudMart RDS password
 
   AuthToken:
     Type: String
     NoEcho: true
-    MinLength: 16
-    Description: CloudMart API authentication token
-
-  LowStockThreshold:
-    Type: String
-    Default: '10'
-    Description: Inventory quantity that triggers low-stock alert
-
-
-# ============================================================
-# RESOURCES
-# ============================================================
+    MinLength: 1
+    Description: Authentication token used by the Lambda Authorizer
 
 Resources:
 
-  # ==========================================================
-  # 1. SSM PARAMETER STORE
-  # ==========================================================
+  # ------------------------------------------------------------
+  # SSM Parameter - Authentication Token
+  # ------------------------------------------------------------
 
   AuthTokenParameter:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /cloudmart/${Environment}/auth/api-token
-      Type: String
+      Type: SecureString
       Value: !Ref AuthToken
       Description: CloudMart API authentication token
       Tags:
         Environment: !Ref Environment
         Application: CloudMart
-        Purpose: Authentication
 
 
-  DBHostParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/host
-      Type: String
-      Value:
-        Fn::ImportValue:
-          !Sub CloudMart-${Environment}-RdsEndpoint
-      Description: CloudMart RDS endpoint
-      Tags:
-        Environment: !Ref Environment
-        Application: CloudMart
-        Purpose: Database
+  # ------------------------------------------------------------
+  # Lambda Authorizer IAM Role
+  # ------------------------------------------------------------
 
-
-  DBPortParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/port
-      Type: String
-      Value:
-        Fn::ImportValue:
-          !Sub CloudMart-${Environment}-RdsPort
-      Description: CloudMart RDS MySQL port
-      Tags:
-        Environment: !Ref Environment
-        Application: CloudMart
-        Purpose: Database
-
-
-  DBNameParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/db-name
-      Type: String
-      Value: cloudmart
-      Description: CloudMart database name
-      Tags:
-        Environment: !Ref Environment
-        Application: CloudMart
-        Purpose: Database
-
-
-  DBUsernameParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/username
-      Type: String
-      Value: !Ref DBUsername
-      Description: CloudMart RDS username
-      Tags:
-        Environment: !Ref Environment
-        Application: CloudMart
-        Purpose: Database
-
-
-  DBPasswordParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/password
-      Type: String
-      Value: !Ref DBPassword
-      Description: CloudMart RDS password
-      Tags:
-        Environment: !Ref Environment
-        Application: CloudMart
-        Purpose: Database
-
-
-  LowStockThresholdParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/inventory/low-stock-threshold
-      Type: String
-      Value: !Ref LowStockThreshold
-      Description: CloudMart low-stock threshold
-      Tags:
-        Environment: !Ref Environment
-        Application: CloudMart
-        Purpose: Inventory
-
-
-  # ==========================================================
-  # 2. LAMBDA AUTHORIZER IAM ROLE
-  # ==========================================================
-
-  LambdaAuthorizerRole:
+  AuthorizerRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub CloudMart-LambdaAuthorizer-${Environment}
+      RoleName: !Sub CloudMart-Authorizer-Role-${Environment}
 
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -166,7 +56,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: LambdaAuthorizerReadAuthToken
+        - PolicyName: AuthorizerSSMAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -176,7 +66,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/api-token
 
-        - PolicyName: LambdaAuthorizerCloudWatchLogs
+        - PolicyName: AuthorizerCloudWatchLogs
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -186,531 +76,172 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/CloudMart-Authorizer-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-authorizer-${Environment}:*
 
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: CloudMart
+  # ------------------------------------------------------------
+  # Lambda Authorizer
+  # ------------------------------------------------------------
 
-
-  # ==========================================================
-  # 3. PRODUCT LAMBDA IAM ROLE
-  # ==========================================================
-
-  ProductLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub CloudMart-ProductLambda-${Environment}
-
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-
-      Policies:
-
-        - PolicyName: ProductLambdaReadSSM
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/inventory/*
-
-        - PolicyName: ProductLambdaEventBridge
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - events:PutEvents
-                Resource: '*'
-
-        - PolicyName: ProductLambdaSNS
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - sns:Publish
-                Resource: '*'
-
-        - PolicyName: ProductLambdaCloudWatchMetrics
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - cloudwatch:PutMetricData
-                Resource: '*'
-
-        - PolicyName: ProductLambdaCloudWatchLogs
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource:
-                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-
-        - PolicyName: ProductLambdaVPCAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ec2:CreateNetworkInterface
-                  - ec2:DescribeNetworkInterfaces
-                  - ec2:DeleteNetworkInterface
-                  - ec2:AssignPrivateIpAddresses
-                  - ec2:UnassignPrivateIpAddresses
-                  - ec2:DescribeSubnets
-                  - ec2:DescribeSecurityGroups
-                Resource: '*'
-
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: CloudMart
-
-
-  # ==========================================================
-  # 4. ORDER LAMBDA IAM ROLE
-  # ==========================================================
-
-  OrderLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub CloudMart-OrderLambda-${Environment}
-
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-
-      Policies:
-
-        - PolicyName: OrderLambdaReadSSM
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/eventbridge/*
-
-        - PolicyName: OrderLambdaInvokeProcessor
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                Resource: '*'
-
-        - PolicyName: OrderLambdaEventBridge
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - events:PutEvents
-                Resource: '*'
-
-        - PolicyName: OrderLambdaSNS
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - sns:Publish
-                Resource: '*'
-
-        - PolicyName: OrderLambdaCloudWatchMetrics
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - cloudwatch:PutMetricData
-                Resource: '*'
-
-        - PolicyName: OrderLambdaCloudWatchLogs
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource:
-                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-
-        - PolicyName: OrderLambdaVPCAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ec2:CreateNetworkInterface
-                  - ec2:DescribeNetworkInterfaces
-                  - ec2:DeleteNetworkInterface
-                  - ec2:AssignPrivateIpAddresses
-                  - ec2:UnassignPrivateIpAddresses
-                  - ec2:DescribeSubnets
-                  - ec2:DescribeSecurityGroups
-                Resource: '*'
-
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: CloudMart
-
-
-  # ==========================================================
-  # 5. REPORT LAMBDA IAM ROLE
-  # ==========================================================
-
-  ReportLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub CloudMart-ReportLambda-${Environment}
-
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-
-      Policies:
-
-        - PolicyName: ReportLambdaReadSSM
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-
-        - PolicyName: ReportLambdaS3
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:PutObject
-                  - s3:AbortMultipartUpload
-                Resource: '*'
-
-        - PolicyName: ReportLambdaCloudWatchMetrics
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - cloudwatch:PutMetricData
-                Resource: '*'
-
-        - PolicyName: ReportLambdaCloudWatchLogs
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource:
-                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-
-        - PolicyName: ReportLambdaVPCAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ec2:CreateNetworkInterface
-                  - ec2:DescribeNetworkInterfaces
-                  - ec2:DeleteNetworkInterface
-                  - ec2:AssignPrivateIpAddresses
-                  - ec2:UnassignPrivateIpAddresses
-                  - ec2:DescribeSubnets
-                  - ec2:DescribeSecurityGroups
-                Resource: '*'
-
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: CloudMart
-
-
-  # ==========================================================
-  # 6. EC2 DASHBOARD IAM ROLE
-  # ==========================================================
-
-  EC2DashboardRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub CloudMart-EC2Dashboard-${Environment}
-
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - sts:AssumeRole
-
-      Policies:
-
-        - PolicyName: EC2DashboardS3
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:ListBucket
-                Resource: '*'
-
-        - PolicyName: EC2DashboardSSM
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-
-        - PolicyName: EC2DashboardCloudWatchLogs
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource:
-                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/cloudmart/dashboard/*
-
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: CloudMart
-
-
-  # ==========================================================
-  # 7. LAMBDA AUTHORIZER
-  # ==========================================================
-
-  LambdaAuthorizer:
+  AuthorizerFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub CloudMart-Authorizer-${Environment}
+      FunctionName: !Sub cloudmart-authorizer-${Environment}
 
       Runtime: python3.12
-
       Handler: index.lambda_handler
 
-      Role: !GetAtt LambdaAuthorizerRole.Arn
+      Role: !GetAtt AuthorizerRole.Arn
 
       Timeout: 10
-
       MemorySize: 128
 
       Environment:
         Variables:
-          AUTH_TOKEN_PARAMETER: !Sub /cloudmart/${Environment}/auth/api-token
+          AUTH_TOKEN_PARAMETER:
+            !Ref AuthTokenParameter
 
       Code:
         ZipFile: |
-          import os
           import boto3
+          import os
 
           ssm = boto3.client("ssm")
-
-          TOKEN_PARAMETER = os.environ["AUTH_TOKEN_PARAMETER"]
-
-          def get_auth_token():
-              response = ssm.get_parameter(
-                  Name=TOKEN_PARAMETER,
-                  WithDecryption=True
-              )
-              return response["Parameter"]["Value"]
 
           def lambda_handler(event, context):
 
               try:
-                  expected_token = get_auth_token()
+                  token_parameter = os.environ["AUTH_TOKEN_PARAMETER"]
+
+                  response = ssm.get_parameter(
+                      Name=token_parameter,
+                      WithDecryption=True
+                  )
+
+                  expected_token = response["Parameter"]["Value"]
 
                   headers = event.get("headers") or {}
 
-                  authorization = (
+                  provided_token = (
                       headers.get("Authorization")
                       or headers.get("authorization")
                   )
 
-                  if not authorization:
+                  if not provided_token:
                       return {
-                          "isAuthorized": False
+                          "principalId": "anonymous",
+                          "policyDocument": {
+                              "Version": "2012-10-17",
+                              "Statement": [
+                                  {
+                                      "Action": "execute-api:Invoke",
+                                      "Effect": "Deny",
+                                      "Resource": event.get(
+                                          "methodArn",
+                                          "*"
+                                      )
+                                  }
+                              ]
+                          }
                       }
 
-                  if authorization.startswith("Bearer "):
-                      token = authorization[7:].strip()
-                  else:
-                      token = authorization.strip()
+                  if provided_token.startswith("Bearer "):
+                      provided_token = provided_token[7:]
 
-                  if token == expected_token:
+                  if provided_token != expected_token:
                       return {
-                          "isAuthorized": True
+                          "principalId": "unauthorized",
+                          "policyDocument": {
+                              "Version": "2012-10-17",
+                              "Statement": [
+                                  {
+                                      "Action": "execute-api:Invoke",
+                                      "Effect": "Deny",
+                                      "Resource": event.get(
+                                          "methodArn",
+                                          "*"
+                                      )
+                                  }
+                              ]
+                          }
                       }
 
                   return {
-                      "isAuthorized": False
+                      "principalId": "cloudmart-user",
+                      "policyDocument": {
+                          "Version": "2012-10-17",
+                          "Statement": [
+                              {
+                                  "Action": "execute-api:Invoke",
+                                  "Effect": "Allow",
+                                  "Resource": event.get(
+                                      "methodArn",
+                                      "*"
+                                  )
+                              }
+                          ]
+                      }
                   }
 
               except Exception as error:
-                  print(f"Authorization error: {error}")
+                  print(f"Authorizer error: {error}")
 
                   return {
-                      "isAuthorized": False
+                      "principalId": "error",
+                      "policyDocument": {
+                          "Version": "2012-10-17",
+                          "Statement": [
+                              {
+                                  "Action": "execute-api:Invoke",
+                                  "Effect": "Deny",
+                                  "Resource": event.get(
+                                      "methodArn",
+                                      "*"
+                                  )
+                              }
+                          ]
+                      }
                   }
 
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: CloudMart
 
-# ============================================================
-# OUTPUTS
-# ============================================================
+  # ------------------------------------------------------------
+  # Lambda Permission for API Gateway
+  # ------------------------------------------------------------
+
+  AuthorizerLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AuthorizerFunction
+      Principal: apigateway.amazonaws.com
+
+
+# --------------------------------------------------------------
+# Outputs
+# --------------------------------------------------------------
 
 Outputs:
 
-  LambdaAuthorizerArn:
-    Description: CloudMart Lambda Authorizer Function ARN
-    Value: !GetAtt LambdaAuthorizer.Arn
+  AuthorizerFunctionArn:
+    Description: CloudMart Lambda Authorizer ARN
+    Value: !GetAtt AuthorizerFunction.Arn
     Export:
-      Name: !Sub CloudMart-${Environment}-LambdaAuthorizerArn
+      Name: !Sub CloudMart-${Environment}-AuthorizerFunctionArn
 
-
-  LambdaAuthorizerInvokeArn:
-    Description: CloudMart Lambda Authorizer API Gateway Invoke ARN
-    Value: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaAuthorizer.Arn}/invocations
+  AuthorizerFunctionInvokeArn:
+    Description: CloudMart Lambda Authorizer Invoke ARN
+    Value: !Sub
+      - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerArn}/invocations
+      - AuthorizerArn: !GetAtt AuthorizerFunction.Arn
     Export:
-      Name: !Sub CloudMart-${Environment}-LambdaAuthorizerInvokeArn
-
-
-  LambdaAuthorizerRoleArn:
-    Description: CloudMart Lambda Authorizer IAM Role ARN
-    Value: !GetAtt LambdaAuthorizerRole.Arn
-    Export:
-      Name: !Sub CloudMart-${Environment}-LambdaAuthorizerRoleArn
-
-
-  ProductLambdaRoleArn:
-    Description: CloudMart Product Lambda IAM Role ARN
-    Value: !GetAtt ProductLambdaRole.Arn
-    Export:
-      Name: !Sub CloudMart-${Environment}-ProductLambdaRoleArn
-
-
-  OrderLambdaRoleArn:
-    Description: CloudMart Order Lambda IAM Role ARN
-    Value: !GetAtt OrderLambdaRole.Arn
-    Export:
-      Name: !Sub CloudMart-${Environment}-OrderLambdaRoleArn
-
-
-  ReportLambdaRoleArn:
-    Description: CloudMart Report Lambda IAM Role ARN
-    Value: !GetAtt ReportLambdaRole.Arn
-    Export:
-      Name: !Sub CloudMart-${Environment}-ReportLambdaRoleArn
-
-
-  EC2DashboardRoleArn:
-    Description: CloudMart EC2 Dashboard IAM Role ARN
-    Value: !GetAtt EC2DashboardRole.Arn
-    Export:
-      Name: !Sub CloudMart-${Environment}-EC2DashboardRoleArn
-
+      Name: !Sub CloudMart-${Environment}-AuthorizerFunctionInvokeArn
 
   AuthTokenParameterName:
-    Description: API authentication token SSM parameter
-    Value: !Sub /cloudmart/${Environment}/auth/api-token
+    Description: SSM parameter containing the CloudMart API token
+    Value: !Ref AuthTokenParameter
     Export:
-      Name: !Sub CloudMart-${Environment}-AuthTokenParameter
-
-
-  DBHostParameterName:
-    Description: RDS host SSM parameter
-    Value: !Sub /cloudmart/${Environment}/rds/host
-    Export:
-      Name: !Sub CloudMart-${Environment}-DBHostParameter
-
-
-  DBPortParameterName:
-    Description: RDS port SSM parameter
-    Value: !Sub /cloudmart/${Environment}/rds/port
-    Export:
-      Name: !Sub CloudMart-${Environment}-DBPortParameter
-
-
-  DBNameParameterName:
-    Description: RDS database name SSM parameter
-    Value: !Sub /cloudmart/${Environment}/rds/db-name
-    Export:
-      Name: !Sub CloudMart-${Environment}-DBNameParameter
-
-
-  DBUsernameParameterName:
-    Description: RDS username SSM parameter
-    Value: !Sub /cloudmart/${Environment}/rds/username
-    Export:
-      Name: !Sub CloudMart-${Environment}-DBUsernameParameter
-
-
-  DBPasswordParameterName:
-    Description: RDS password SSM parameter
-    Value: !Sub /cloudmart/${Environment}/rds/password
-    Export:
-      Name: !Sub CloudMart-${Environment}-DBPasswordParameter
-
-
-  LowStockThresholdParameterName:
-    Description: Low-stock threshold SSM parameter
-    Value: !Sub /cloudmart/${Environment}/inventory/low-stock-threshold
-    Export:
-      Name: !Sub CloudMart-${Environment}-LowStockThresholdParameter
+      Name: !Sub CloudMart-${Environment}-AuthTokenParameterName
