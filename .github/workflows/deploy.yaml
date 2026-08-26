@@ -102,13 +102,11 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy Auth Stack
-        run: |
-          aws cloudformation deploy \
-            --template-file cloudformation/auth-stack.yaml \
-            --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
-            --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              DBUsername=${{ secrets.DB_USERNAME }} \
-              DBPassword=${{ secrets.DB_PASSWORD }} \
-              AuthToken=${{ secrets.AUTH_TOKEN }} \
-            --capabilities CAPABILITY_NAMED_IAM
+ run: |
+    aws cloudformation deploy \
+      --template-file cloudformation/auth-stack.yaml \
+      --stack-name cloudmart-auth-dev \
+      --parameter-overrides \
+        Environment=dev \
+        AuthToken="${{ secrets.CLOUDMART_AUTH_TOKEN }}" \
+      --capabilities CAPABILITY_NAMED_IAM
