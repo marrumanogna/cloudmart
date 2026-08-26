@@ -43,6 +43,7 @@ jobs:
             --parameter-overrides Environment=${{ env.ENVIRONMENT }} \
             --capabilities CAPABILITY_NAMED_IAM
 
+
   deploy-data:
     name: Deploy Data Stack
     needs: deploy-network
@@ -68,4 +69,31 @@ jobs:
               Environment=${{ env.ENVIRONMENT }} \
               DBUsername=${{ secrets.DB_USERNAME }} \
               DBPassword=${{ secrets.DB_PASSWORD }} \
+            --capabilities CAPABILITY_NAMED_IAM
+
+
+  deploy-auth:
+    name: Deploy Auth Stack
+    needs: deploy-data
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Auth Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/auth-stack.yaml \
+            --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
+              EventBusName=cloudmart-events-${{ env.ENVIRONMENT }} \
             --capabilities CAPABILITY_NAMED_IAM
