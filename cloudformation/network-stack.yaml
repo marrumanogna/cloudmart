@@ -95,7 +95,6 @@ Resources:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
-
       Tags:
         - Key: Name
           Value: !Sub cloudmart-private-rt-${Environment}
@@ -201,6 +200,58 @@ Resources:
       ToPort: 443
       CidrIp: 10.0.0.0/16
 
+  # =========================================================
+  # VPC ENDPOINT SECURITY GROUP
+  # =========================================================
+
+  VpcEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for CloudMart VPC Interface Endpoints
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref Ec2DashboardSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub sg-vpc-endpoints-${Environment}
+
+  # =========================================================
+  # SSM INTERFACE VPC ENDPOINT
+  # =========================================================
+
+  SsmVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      VpcEndpointType: Interface
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # =========================================================
+  # S3 GATEWAY VPC ENDPOINT
+  # =========================================================
+
+  S3VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      VpcEndpointType: Gateway
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
 Outputs:
 
   VpcId:
@@ -237,3 +288,8 @@ Outputs:
     Value: !Ref Ec2DashboardSecurityGroup
     Export:
       Name: !Sub CloudMart-${Environment}-Ec2SecurityGroupId
+
+  VpcEndpointSecurityGroupId:
+    Value: !Ref VpcEndpointSecurityGroup
+    Export:
+      Name: !Sub CloudMart-${Environment}-VpcEndpointSecurityGroupId
