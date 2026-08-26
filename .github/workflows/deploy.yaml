@@ -20,6 +20,10 @@ env:
 
 jobs:
 
+  # ==========================================================
+  # NETWORK
+  # ==========================================================
+
   deploy-network:
     name: Deploy Network Stack
     runs-on: ubuntu-latest
@@ -40,9 +44,14 @@ jobs:
           aws cloudformation deploy \
             --template-file cloudformation/network-stack.yaml \
             --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
-            --parameter-overrides Environment=${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
             --capabilities CAPABILITY_NAMED_IAM
 
+
+  # ==========================================================
+  # DATA
+  # ==========================================================
 
   deploy-data:
     name: Deploy Data Stack
@@ -72,6 +81,10 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM
 
 
+  # ==========================================================
+  # AUTH
+  # ==========================================================
+
   deploy-auth:
     name: Deploy Auth Stack
     needs: deploy-data
@@ -95,5 +108,7 @@ jobs:
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
-              EventBusName=cloudmart-events-${{ env.ENVIRONMENT }} \
+              DBUsername=${{ secrets.DB_USERNAME }} \
+              DBPassword=${{ secrets.DB_PASSWORD }} \
+              AuthToken=${{ secrets.AUTH_TOKEN }} \
             --capabilities CAPABILITY_NAMED_IAM
