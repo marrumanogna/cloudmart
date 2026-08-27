@@ -17,6 +17,79 @@ Parameters:
 
 Resources:
 
+  # ============================================================
+  # SSM PARAMETERS
+  # ============================================================
+
+  AuthTokenParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/auth/api-token
+      Type: SecureString
+      Value: CHANGE_ME
+      Description: CloudMart API authentication token
+
+  RDSHostParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/host
+      Type: String
+      Value: CHANGE_ME
+      Description: RDS database address
+
+  RDSPortParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/port
+      Type: String
+      Value: '3306'
+      Description: RDS database port
+
+  RDSDBNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/db-name
+      Type: String
+      Value: CHANGE_ME
+      Description: RDS database schema name
+
+  RDSUsernameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/username
+      Type: SecureString
+      Value: CHANGE_ME
+      Description: RDS database username
+
+  RDSPasswordParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/password
+      Type: SecureString
+      Value: CHANGE_ME
+      Description: RDS database password
+
+  LowStockThresholdParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/inventory/low-stock-threshold
+      Type: String
+      Value: '10'
+      Description: Defines when low-stock alert should trigger
+
+  OrderNotificationsTopicArnParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/sns/order-notifications-topic-arn
+      Type: String
+      Value: CHANGE_ME
+      Description: Order notification SNS topic ARN
+
+
+  # ============================================================
+  # EXISTING AUTH STACK - UNCHANGED
+  # ============================================================
+
   AuthorizerRole:
     Type: AWS::IAM::Role
     Properties:
@@ -144,6 +217,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref AuthorizerFunction
       Principal: apigateway.amazonaws.com
+
 
 Outputs:
 
