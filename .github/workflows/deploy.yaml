@@ -20,11 +20,16 @@ env:
 
 jobs:
 
+  # ============================================================
+  # NETWORK
+  # ============================================================
+
   deploy-network:
     name: Deploy Network Stack
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -49,12 +54,17 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM
 
 
+  # ============================================================
+  # DATA
+  # ============================================================
+
   deploy-data:
     name: Deploy Data Stack
     needs: deploy-network
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -84,7 +94,9 @@ jobs:
         env:
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
         run: |
+
           RDS_HOST=$(aws cloudformation describe-stacks \
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='RdsEndpoint'].OutputValue" \
@@ -131,12 +143,17 @@ jobs:
             --overwrite
 
 
+  # ============================================================
+  # AUTH
+  # ============================================================
+
   deploy-auth:
     name: Deploy Auth Stack
     needs: deploy-data
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -147,15 +164,21 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Verify Auth Token Secret
+        env:
+          AUTH_TOKEN: ${{ secrets.CLOUDMART_AUTH_TOKEN }}
+
         run: |
-          if [ -z "${{ secrets.CLOUDMART_AUTH_TOKEN }}" ]; then
+          if [ -z "$AUTH_TOKEN" ]; then
             echo "ERROR: CLOUDMART_AUTH_TOKEN secret is missing"
             exit 1
           fi
 
+          echo "CLOUDMART_AUTH_TOKEN secret found"
+
       - name: Store Auth Token in SSM
         env:
           AUTH_TOKEN: ${{ secrets.CLOUDMART_AUTH_TOKEN }}
+
         run: |
           aws ssm put-parameter \
             --name "/cloudmart/${ENVIRONMENT}/auth/api-token" \
@@ -177,3 +200,45 @@ jobs:
               Environment=${{ env.ENVIRONMENT }} \
               AuthTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/api-token" \
             --capabilities CAPABILITY_NAMED_IAM
+
+
+  # ============================================================
+  # API / APPLICATION
+  # ============================================================
+
+  deploy-api:
+    name: Deploy API and Application Stack
+    needs: deploy-auth
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate API Template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/api-stack.yaml
+
+      - name: Deploy API Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/api-stack.yaml \
+            --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
+            --capabilities CAPABILITY_NAMED_IAM
+
+      - name: Show API Outputs
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs" \
+            --output table
