@@ -378,7 +378,7 @@ Resources:
   # ============================================================
 
   OrderLambda:
-    Type: AWS::Serverless::Function
+    Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub cloudmart-order-${Environment}
       Runtime: python3.11
