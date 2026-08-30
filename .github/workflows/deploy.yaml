@@ -229,6 +229,7 @@ jobs:
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
+              LowStockEmail="marrumanogna@gmail.com" \
             --capabilities CAPABILITY_NAMED_IAM
 
       - name: Show API Outputs

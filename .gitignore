@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.env.*
+
+# AWS temporary files
+*.zip
+*.pem
+
+# Test / temporary JSON responses
+*-response.json
+response.json
+authorizer-test.json
+authorizer-payload.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

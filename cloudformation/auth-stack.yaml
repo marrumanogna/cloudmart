@@ -106,11 +106,25 @@ Resources:
 
               method_arn = event.get("methodArn", "*")
 
+              # Allow all methods and resources belonging to this API stage.
+              # Example:
+              # arn:aws:execute-api:region:account:api-id/dev/*
+              arn_parts = method_arn.split("/")
+
+              if len(arn_parts) >= 2:
+                  policy_resource = f"{arn_parts[0]}/{arn_parts[1]}/*"
+              else:
+                  policy_resource = method_arn
+
               provided_token = event.get("authorizationToken", "")
 
               if not provided_token:
                   headers = event.get("headers") or {}
                   provided_token = headers.get("authorization", "")
+
+              if not provided_token:
+                  headers = event.get("headers") or {}
+                  provided_token = headers.get("Authorization", "")
 
               if provided_token.lower().startswith("bearer "):
                   provided_token = provided_token[7:].strip()
@@ -119,6 +133,7 @@ Resources:
                   expected_token = get_auth_token()
               except Exception as error:
                   print(f"Failed to retrieve authentication token: {error}")
+
                   return generate_policy(
                       "cloudmart-unauthorized",
                       "Deny",
@@ -129,7 +144,7 @@ Resources:
                   return generate_policy(
                       "cloudmart-user",
                       "Allow",
-                      method_arn
+                      policy_resource
                   )
 
               return generate_policy(
