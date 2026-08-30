@@ -1,4 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
 
 Description: CloudMart API and Application Stack
 
@@ -334,7 +336,7 @@ Resources:
   # ============================================================
 
   ProductLambda:
-    Type: AWS::Lambda::Function
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub cloudmart-product-${Environment}
       Runtime: python3.11
@@ -369,40 +371,14 @@ Resources:
           EVENT_BUS_NAME: !Ref CloudMartEventBus
           LOW_STOCK_TOPIC_ARN: !Ref LowStockTopic
 
-      Code:
-        ZipFile: |
-          import json
-          import os
-          import boto3
-
-          cloudwatch = boto3.client("cloudwatch")
-
-          def lambda_handler(event, context):
-
-              print(json.dumps({
-                  "message": "Product Lambda invoked",
-                  "environment": os.environ["ENVIRONMENT"],
-                  "request_id": context.aws_request_id
-              }))
-
-              return {
-                  "statusCode": 200,
-                  "headers": {
-                      "Content-Type": "application/json"
-                  },
-                  "body": json.dumps({
-                      "message": "Product service is deployed",
-                      "service": "product"
-                  })
-              }
-
+      CodeUri: ../product-lambda/package/
 
   # ============================================================
   # ORDER LAMBDA
   # ============================================================
 
   OrderLambda:
-    Type: AWS::Lambda::Function
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub cloudmart-order-${Environment}
       Runtime: python3.11

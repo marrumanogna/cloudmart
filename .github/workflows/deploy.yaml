@@ -222,15 +222,24 @@ jobs:
           aws cloudformation validate-template \
             --template-body file://cloudformation/api-stack.yaml
 
+      - name: Package API SAM Template
+        run: |
+          aws cloudformation package \
+            --template-file cloudformation/api-stack.yaml \
+            --s3-bucket cloudmart-data-dev-artifactsbucket-sa0b9hgkhvza \
+            --output-template-file cloudformation/api-stack-packaged.yaml \
+            --region ${{ env.AWS_REGION }}
+
       - name: Deploy API Stack
         run: |
           aws cloudformation deploy \
-            --template-file cloudformation/api-stack.yaml \
+            --template-file cloudformation/api-stack-packaged.yaml \
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
               LowStockEmail="marrumanogna@gmail.com" \
-            --capabilities CAPABILITY_NAMED_IAM
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
 
       - name: Show API Outputs
         run: |
