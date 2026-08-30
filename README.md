@@ -300,7 +300,6 @@ cloudmart/
 
 ├── auth-template.yaml
 
-├── oidc-policy.json
 
 ├── trust-policy.json
 
@@ -2108,7 +2107,6 @@ and uses them for subsequent configuration.
 
 
 
-A dedicated RDS connectivity test Lambda is used to verify communication between Lambda and RDS.
 
 
 
