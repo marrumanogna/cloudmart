@@ -147,11 +147,8 @@ Resources:
                       policy_resource
                   )
 
-              return generate_policy(
-                  "cloudmart-unauthorized",
-                  "Deny",
-                  method_arn
-              )
+              print("Authorization failed")
+              raise Exception("Unauthorized")
 
   AuthorizerLambdaPermission:
     Type: AWS::Lambda::Permission
