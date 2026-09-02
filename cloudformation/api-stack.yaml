@@ -27,6 +27,10 @@ Conditions:
 
 Resources:
 
+  FailedOrdersQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub cloudmart-failed-orders-${Environment}
   # ============================================================
   # PRODUCT LAMBDA ROLE
   # ============================================================
@@ -231,6 +235,23 @@ Resources:
                   - ec2:DeleteNetworkInterface
                 Resource: '*'
 
+        - PolicyName: OrderProcessorSQS
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !GetAtt FailedOrdersQueue.Arn
+
+        - PolicyName: OrderProcessorEvents
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - events:PutEvents
+                Resource: !GetAtt CloudMartEventBus.Arn
 
   # ============================================================
   # REPORT LAMBDA ROLE
@@ -378,7 +399,7 @@ Resources:
   # ============================================================
 
   OrderLambda:
-    Type: AWS::Lambda::Function
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub cloudmart-order-${Environment}
       Runtime: python3.11
@@ -400,40 +421,15 @@ Resources:
           ORDER_PROCESSOR_FUNCTION: !Ref OrderProcessorLambda
           EVENT_BUS_NAME: !Ref CloudMartEventBus
 
-      Code:
-        ZipFile: |
-          import json
-          import os
-          import boto3
 
-          lambda_client = boto3.client("lambda")
-
-          def lambda_handler(event, context):
-
-              print(json.dumps({
-                  "message": "Order Lambda invoked",
-                  "environment": os.environ["ENVIRONMENT"],
-                  "request_id": context.aws_request_id
-              }))
-
-              return {
-                  "statusCode": 200,
-                  "headers": {
-                      "Content-Type": "application/json"
-                  },
-                  "body": json.dumps({
-                      "message": "Order service is deployed",
-                      "service": "order"
-                  })
-              }
-
+      CodeUri: ../order-lambda/package/
 
   # ============================================================
   # ORDER PROCESSOR LAMBDA
   # ============================================================
 
   OrderProcessorLambda:
-    Type: AWS::Lambda::Function
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub cloudmart-order-processor-${Environment}
       Runtime: python3.11
@@ -465,26 +461,10 @@ Resources:
           DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
           DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
 
-      Code:
-        ZipFile: |
-          import json
-          import os
+          FAILED_ORDERS_QUEUE_URL: !Ref FailedOrdersQueue
+          EVENT_BUS_NAME: !Ref CloudMartEventBus
 
-          def lambda_handler(event, context):
-
-              print(json.dumps({
-                  "message": "Order Processor Lambda invoked",
-                  "environment": os.environ["ENVIRONMENT"],
-                  "request_id": context.aws_request_id
-              }))
-
-              return {
-                  "statusCode": 200,
-                  "body": json.dumps({
-                      "message": "Order processor is deployed"
-                  })
-              }
-
+      CodeUri: ../order-processor-lambda/package/
 
   # ============================================================
   # REPORT LAMBDA
