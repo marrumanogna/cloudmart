@@ -371,7 +371,21 @@ Resources:
       Endpoint: !Ref LowStockEmail
       TopicArn: !Ref OrderConfirmedTopic
 
+  # ============================================================
+  # M3 INVENTORY CHANGE EVENTBRIDGE RULE
+  # ============================================================
 
+  InventoryChangeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub cloudmart-inventory-change-${Environment}
+      EventBusName: !Ref CloudMartEventBus
+
+      EventPattern:
+        source:
+          - cloudmart.product
+        detail-type:
+          - Inventory Change
   # ============================================================
   # M4 ORDER CONFIRMED EVENTBRIDGE RULE
   # ============================================================
