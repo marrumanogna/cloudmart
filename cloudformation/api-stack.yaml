@@ -1,7 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
-
 Description: CloudMart API and Application Stack
 
 Parameters:
@@ -31,6 +30,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub cloudmart-failed-orders-${Environment}
+
   # ============================================================
   # PRODUCT LAMBDA ROLE
   # ============================================================
@@ -237,7 +237,7 @@ Resources:
 
         - PolicyName: OrderProcessorSQS
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
@@ -246,12 +246,14 @@ Resources:
 
         - PolicyName: OrderProcessorEvents
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - events:PutEvents
-                Resource: !GetAtt CloudMartEventBus.Arn
+                Resource:
+                  - !GetAtt CloudMartEventBus.Arn
+
 
   # ============================================================
   # REPORT LAMBDA ROLE
@@ -353,6 +355,67 @@ Resources:
 
 
   # ============================================================
+  # M4 ORDER CONFIRMATION SNS
+  # ============================================================
+
+  OrderConfirmedTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub cloudmart-order-confirmed-${Environment}
+
+
+  OrderConfirmedSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref LowStockEmail
+      TopicArn: !Ref OrderConfirmedTopic
+
+
+  # ============================================================
+  # M4 ORDER CONFIRMED EVENTBRIDGE RULE
+  # ============================================================
+
+  OrderConfirmedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub cloudmart-order-confirmed-${Environment}
+      EventBusName: !Ref CloudMartEventBus
+
+      EventPattern:
+        source:
+          - cloudmart.order
+        detail-type:
+          - OrderConfirmed
+
+      Targets:
+        - Arn: !Ref OrderConfirmedTopic
+          Id: OrderConfirmedSNSTarget
+
+
+  OrderConfirmedTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref OrderConfirmedTopic
+
+      PolicyDocument:
+        Version: '2012-10-17'
+
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action:
+              - sns:Publish
+            Resource: !Ref OrderConfirmedTopic
+
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt OrderConfirmedRule.Arn
+
+
+  # ============================================================
   # PRODUCT LAMBDA
   # ============================================================
 
@@ -370,6 +433,7 @@ Resources:
         SubnetIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnetId
           - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnet2Id
+
         SecurityGroupIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-LambdaSecurityGroupId
 
@@ -394,6 +458,7 @@ Resources:
 
       CodeUri: ../product-lambda/package/
 
+
   # ============================================================
   # ORDER LAMBDA
   # ============================================================
@@ -412,6 +477,7 @@ Resources:
         SubnetIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnetId
           - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnet2Id
+
         SecurityGroupIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-LambdaSecurityGroupId
 
@@ -421,8 +487,8 @@ Resources:
           ORDER_PROCESSOR_FUNCTION: !Ref OrderProcessorLambda
           EVENT_BUS_NAME: !Ref CloudMartEventBus
 
-
       CodeUri: ../order-lambda/package/
+
 
   # ============================================================
   # ORDER PROCESSOR LAMBDA
@@ -442,6 +508,7 @@ Resources:
         SubnetIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnetId
           - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnet2Id
+
         SecurityGroupIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-LambdaSecurityGroupId
 
@@ -466,6 +533,7 @@ Resources:
 
       CodeUri: ../order-processor-lambda/package/
 
+
   # ============================================================
   # REPORT LAMBDA
   # ============================================================
@@ -484,6 +552,7 @@ Resources:
         SubnetIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnetId
           - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnet2Id
+
         SecurityGroupIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-LambdaSecurityGroupId
 
