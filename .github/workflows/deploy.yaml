@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'cloudformation/**'
+      - 'product-lambda/**'
       - '.github/workflows/deploy.yaml'
 
   workflow_dispatch:
