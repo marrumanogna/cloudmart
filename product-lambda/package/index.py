@@ -4,10 +4,6 @@ import boto3
 import pymysql
 
 ssm = boto3.client("ssm")
-events = boto3.client("events")
-sns = boto3.client("sns")
-
-LOW_STOCK_THRESHOLD = 5
 
 
 def get_db_connection():
@@ -47,107 +43,6 @@ def response(status_code, message, data=None):
     }
 
 
-def log_success(action, product_id=None, details=None):
-    log_data = {
-        "level": "INFO",
-        "event": "PRODUCT_OPERATION_SUCCESS",
-        "action": action,
-        "environment": os.environ.get("ENVIRONMENT", "unknown")
-    }
-
-    if product_id is not None:
-        log_data["product_id"] = int(product_id)
-
-    if details:
-        log_data.update(details)
-
-    print(json.dumps(log_data, default=str))
-
-
-def publish_inventory_event(action, product):
-    event_detail = {
-        "action": action,
-        "product_id": int(product["product_id"]),
-        "name": product.get("name"),
-        "category": product.get("category"),
-        "price": str(product.get("price")),
-        "stock_count": int(product.get("stock_count", 0))
-    }
-
-    response_data = events.put_events(
-        Entries=[
-            {
-                "EventBusName": os.environ["EVENT_BUS_NAME"],
-                "Source": "cloudmart.product",
-                "DetailType": "Inventory Change",
-                "Detail": json.dumps(event_detail)
-            }
-        ]
-    )
-
-    if response_data.get("FailedEntryCount", 0) > 0:
-        raise Exception(
-            f"EventBridge failed to publish inventory event: {response_data}"
-        )
-
-    print(json.dumps({
-        "level": "INFO",
-        "event": "INVENTORY_EVENT_PUBLISHED",
-        "action": action,
-        "product_id": int(product["product_id"])
-    }))
-
-
-def publish_low_stock_alert(product):
-    stock_count = int(product.get("stock_count", 0))
-
-    if stock_count > LOW_STOCK_THRESHOLD:
-        return
-
-    message = (
-        f"CloudMart Low Stock Alert\n\n"
-        f"Product ID: {product['product_id']}\n"
-        f"Product Name: {product.get('name')}\n"
-        f"Category: {product.get('category')}\n"
-        f"Current Stock: {stock_count}\n"
-        f"Low Stock Threshold: {LOW_STOCK_THRESHOLD}\n"
-    )
-
-    sns.publish(
-        TopicArn=os.environ["LOW_STOCK_TOPIC_ARN"],
-        Subject="CloudMart Low Stock Alert",
-        Message=message
-    )
-
-    print(json.dumps({
-        "level": "INFO",
-        "event": "LOW_STOCK_ALERT_PUBLISHED",
-        "product_id": int(product["product_id"]),
-        "stock_count": stock_count,
-        "threshold": LOW_STOCK_THRESHOLD
-    }))
-
-
-def get_product_by_id(connection, product_id):
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT
-                product_id,
-                name,
-                description,
-                price,
-                category,
-                stock_count,
-                created_at,
-                updated_at
-            FROM products
-            WHERE product_id = %s
-            AND soft_delete IS NULL
-        """, (product_id,))
-
-        return cursor.fetchone()
-
-
 def lambda_handler(event, context):
 
     connection = None
@@ -162,7 +57,6 @@ def lambda_handler(event, context):
         # =====================================================
         # GET /products
         # =====================================================
-
         if method == "GET" and not product_id:
 
             with connection.cursor() as cursor:
@@ -183,11 +77,6 @@ def lambda_handler(event, context):
 
                 products = cursor.fetchall()
 
-            log_success(
-                "GET_PRODUCTS",
-                details={"count": len(products)}
-            )
-
             return response(
                 200,
                 "Products retrieved successfully",
@@ -197,24 +86,31 @@ def lambda_handler(event, context):
         # =====================================================
         # GET /products/{id}
         # =====================================================
-
         if method == "GET" and product_id:
 
-            product = get_product_by_id(
-                connection,
-                product_id
-            )
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        product_id,
+                        name,
+                        description,
+                        price,
+                        category,
+                        stock_count,
+                        created_at,
+                        updated_at
+                    FROM products
+                    WHERE product_id = %s
+                    AND soft_delete IS NULL
+                """, (product_id,))
+
+                product = cursor.fetchone()
 
             if not product:
                 return response(
                     404,
                     "Product not found"
                 )
-
-            log_success(
-                "GET_PRODUCT",
-                product_id
-            )
 
             return response(
                 200,
@@ -225,12 +121,9 @@ def lambda_handler(event, context):
         # =====================================================
         # POST /products
         # =====================================================
-
         if method == "POST":
 
-            body = json.loads(
-                event.get("body") or "{}"
-            )
+            body = json.loads(event.get("body") or "{}")
 
             name = body.get("name")
             description = body.get("description")
@@ -242,14 +135,6 @@ def lambda_handler(event, context):
                 return response(
                     400,
                     "name, price and category are required"
-                )
-
-            try:
-                stock_count = int(stock_count)
-            except (TypeError, ValueError):
-                return response(
-                    400,
-                    "stock_count must be a number"
                 )
 
             with connection.cursor() as cursor:
@@ -276,28 +161,6 @@ def lambda_handler(event, context):
 
             connection.commit()
 
-            product = get_product_by_id(
-                connection,
-                product_id
-            )
-
-            publish_inventory_event(
-                "PRODUCT_CREATED",
-                product
-            )
-
-            publish_low_stock_alert(
-                product
-            )
-
-            log_success(
-                "CREATE_PRODUCT",
-                product_id,
-                {
-                    "stock_count": stock_count
-                }
-            )
-
             return response(
                 201,
                 "Product created successfully",
@@ -307,18 +170,22 @@ def lambda_handler(event, context):
         # =====================================================
         # PUT /products/{id}
         # =====================================================
-
         if method == "PUT" and product_id:
 
-            body = json.loads(
-                event.get("body") or "{}"
-            )
+            body = json.loads(event.get("body") or "{}")
 
             name = body.get("name")
             description = body.get("description")
             price = body.get("price")
             category = body.get("category")
             stock_count = body.get("stock_count")
+
+            # Reject negative stock
+            if stock_count is not None and stock_count < 0:
+                return response(
+                    400,
+                    "Stock must be 0 or greater"
+                )
 
             if (
                 name is None
@@ -329,17 +196,8 @@ def lambda_handler(event, context):
             ):
                 return response(
                     400,
-                    "At least one field is required for update"
+                    "Stock must be positive"
                 )
-
-            if stock_count is not None:
-                try:
-                    stock_count = int(stock_count)
-                except (TypeError, ValueError):
-                    return response(
-                        400,
-                        "stock_count must be a number"
-                    )
 
             fields = []
             values = []
@@ -390,36 +248,9 @@ def lambda_handler(event, context):
                     AND soft_delete IS NULL
                 """
 
-                cursor.execute(
-                    query,
-                    values
-                )
+                cursor.execute(query, values)
 
             connection.commit()
-
-            product = get_product_by_id(
-                connection,
-                product_id
-            )
-
-            publish_inventory_event(
-                "PRODUCT_UPDATED",
-                product
-            )
-
-            publish_low_stock_alert(
-                product
-            )
-
-            log_success(
-                "UPDATE_PRODUCT",
-                product_id,
-                {
-                    "stock_count": int(
-                        product["stock_count"]
-                    )
-                }
-            )
 
             return response(
                 200,
@@ -430,19 +261,12 @@ def lambda_handler(event, context):
         # =====================================================
         # DELETE /products/{id}
         # =====================================================
-
         if method == "DELETE" and product_id:
 
             with connection.cursor() as cursor:
 
                 cursor.execute("""
-                    SELECT
-                        product_id,
-                        name,
-                        description,
-                        price,
-                        category,
-                        stock_count
+                    SELECT product_id
                     FROM products
                     WHERE product_id = %s
                     AND soft_delete IS NULL
@@ -464,16 +288,6 @@ def lambda_handler(event, context):
 
             connection.commit()
 
-            publish_inventory_event(
-                "PRODUCT_DELETED",
-                existing
-            )
-
-            log_success(
-                "DELETE_PRODUCT",
-                product_id
-            )
-
             return response(
                 200,
                 "Product deleted successfully",
@@ -489,12 +303,10 @@ def lambda_handler(event, context):
 
         print(json.dumps({
             "level": "ERROR",
-            "event": "PRODUCT_OPERATION_FAILED",
             "message": "Product Lambda error",
             "error": str(e),
             "method": event.get("httpMethod"),
-            "path": event.get("path"),
-            "request_id": context.aws_request_id
+            "path": event.get("path")
         }))
 
         if connection:
