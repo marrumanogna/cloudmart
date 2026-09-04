@@ -84,14 +84,17 @@ def lambda_handler(event, context):
 
     try:
 
-        if event.get("action") != "PROCESS_ORDER":
+        record = event["Records"][0]
+        message = json.loads(record["body"])
+
+        if message.get("action") != "PROCESS_ORDER":
             return response(
                 400,
                 "Invalid order processor action"
             )
 
-        customer_id = event.get("customer_id")
-        items = event.get("items")
+        customer_id = message.get("customer_id")
+        items = message.get("items")
 
         if not customer_id:
             return response(
