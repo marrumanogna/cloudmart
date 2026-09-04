@@ -131,6 +131,13 @@ def lambda_handler(event, context):
             category = body.get("category")
             stock_count = body.get("stock_count", 0)
 
+            # Reject negative stock
+            if stock_count < 0:
+                return response(
+                    400,
+                    "Stock must be 0 or greater"
+                )
+
             if not name or price is None or not category:
                 return response(
                     400,
