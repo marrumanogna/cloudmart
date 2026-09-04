@@ -180,6 +180,13 @@ def lambda_handler(event, context):
             category = body.get("category")
             stock_count = body.get("stock_count")
 
+            # Reject negative stock
+            if stock_count is not None and stock_count < 0:
+                return response(
+                    400,
+                    "Stock must be 0 or greater"
+                )
+
             if (
                 name is None
                 and description is None
@@ -189,7 +196,7 @@ def lambda_handler(event, context):
             ):
                 return response(
                     400,
-                    "At least one field is required for update"
+                    "Stock must be positive"
                 )
 
             fields = []
@@ -314,4 +321,3 @@ def lambda_handler(event, context):
 
         if connection:
             connection.close()
-
