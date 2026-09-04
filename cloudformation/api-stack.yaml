@@ -387,6 +387,69 @@ Resources:
         detail-type:
           - Inventory Change
   # ============================================================
+  # M4 ORDER PLACED SNS
+  # ============================================================
+
+  OrderPlacedTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub cloudmart-order-placed-${Environment}
+
+
+  OrderPlacedSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref LowStockEmail
+      TopicArn: !Ref OrderPlacedTopic
+
+
+  OrderPlacedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub cloudmart-order-placed-${Environment}
+      EventBusName: !Ref CloudMartEventBus
+
+      EventPattern:
+        source:
+          - cloudmart.order
+        detail-type:
+          - OrderPlaced
+
+      Targets:
+        - Arn: !Ref OrderPlacedTopic
+          Id: OrderPlacedSNSTarget
+
+
+    OrderPlacedTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref OrderPlacedTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action:
+              - sns:Publish
+            Resource: !Ref OrderPlacedTopic
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt OrderPlacedRule.Arn
+    Properties:
+      Topics:
+        - !Ref OrderPlacedTopic
+
+      PolicyDocument:
+        Version: '2012-10-17'
+
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws
+  # ============================================================
   # M4 ORDER CONFIRMED EVENTBRIDGE RULE
   # ============================================================
 
