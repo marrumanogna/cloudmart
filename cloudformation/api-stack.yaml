@@ -397,7 +397,7 @@ Resources:
       TopicName: !Sub cloudmart-order-placed-${Environment}
 
 
-  OrderPlacedSubscriptionV2:
+  OrderPlacedSubscriptionV3:
     Type: AWS::SNS::Subscription
     DeletionPolicy: Delete
     Properties:
