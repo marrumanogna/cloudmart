@@ -84,8 +84,12 @@ def lambda_handler(event, context):
 
     try:
 
-        record = event["Records"][0]
-        message = json.loads(record["body"])
+        message = event
+
+        print(json.dumps({
+            "DEBUG_MESSAGE": message,
+            "DEBUG_MESSAGE_TYPE": str(type(message))
+        }))
 
         if message.get("action") != "PROCESS_ORDER":
             return response(
