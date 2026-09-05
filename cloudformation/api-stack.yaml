@@ -421,34 +421,22 @@ Resources:
           Id: OrderPlacedSNSTarget
 
 
-    OrderPlacedTopicPolicy:
+  OrderPlacedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
       Topics:
-        - !Ref OrderPlacedTopic
+        - !GetAtt OrderPlacedTopic.TopicArn
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
               Service: events.amazonaws.com
-            Action:
-              - sns:Publish
-            Resource: !Ref OrderPlacedTopic
+            Action: sns:Publish
+            Resource: !GetAtt OrderPlacedTopic.TopicArn
             Condition:
               ArnEquals:
                 aws:SourceArn: !GetAtt OrderPlacedRule.Arn
-    Properties:
-      Topics:
-        - !Ref OrderPlacedTopic
-
-      PolicyDocument:
-        Version: '2012-10-17'
-
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: events.amazonaws
   # ============================================================
   # M4 ORDER CONFIRMED EVENTBRIDGE RULE
   # ============================================================
