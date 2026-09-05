@@ -396,8 +396,9 @@ Resources:
       TopicName: !Sub cloudmart-order-placed-${Environment}
 
 
-  OrderPlacedSubscription:
+  OrderPlacedSubscriptionV2:
     Type: AWS::SNS::Subscription
+    DeletionPolicy: Delete
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail
