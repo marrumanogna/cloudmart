@@ -365,7 +365,7 @@ Resources:
       TopicName: !Sub cloudmart-order-confirmed-${Environment}
 
 
-  OrderConfirmedSubscription:
+  OrderConfirmedEmailSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
