@@ -348,6 +348,7 @@ Resources:
   LowStockSubscription:
     Type: AWS::SNS::Subscription
     Condition: CreateLowStockSubscription
+    Condition: CreateLowStockSubscription
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail
@@ -399,6 +400,7 @@ Resources:
 
   OrderPlacedSubscriptionV3:
     Type: AWS::SNS::Subscription
+    Condition: CreateLowStockSubscription
     DeletionPolicy: Delete
     Properties:
       Protocol: email
@@ -494,6 +496,7 @@ Resources:
 
   OrderFailedSubscription:
     Type: AWS::SNS::Subscription
+    Condition: CreateLowStockSubscription
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail
