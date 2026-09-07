@@ -4,6 +4,7 @@ import boto3
 import pymysql
 
 ssm = boto3.client("ssm")
+events = boto3.client("events")
 
 
 def get_db_connection():
@@ -168,6 +169,29 @@ def lambda_handler(event, context):
 
             connection.commit()
 
+            # =================================================
+            # LOW STOCK → EVENTBRIDGE
+            # =================================================
+            print("DEBUG stock_count:", stock_count)
+            
+            if stock_count <= 5:
+                print("LOW STOCK TRIGGERED", stock_count)
+                events.put_events(
+                    Entries=[
+                        {
+                            "EventBusName": os.environ["EVENT_BUS_NAME"],
+                            "Source": "cloudmart.product",
+                            "DetailType": "Inventory Change",
+                            "Detail": json.dumps({
+                                "product_id": product_id,
+                                "product_name": name,
+                                "stock_quantity": stock_count
+                            })
+                        }
+                    ]
+                )
+                print("EVENTBRIDGE EVENT SENT")
+
             return response(
                 201,
                 "Product created successfully",
@@ -258,6 +282,26 @@ def lambda_handler(event, context):
                 cursor.execute(query, values)
 
             connection.commit()
+
+            # =================================================
+            # LOW STOCK → EVENTBRIDGE
+            # =================================================
+            if stock_count is not None and stock_count <= 5:
+
+                events.put_events(
+                    Entries=[
+                        {
+                            "EventBusName": os.environ["EVENT_BUS_NAME"],
+                            "Source": "cloudmart.product",
+                            "DetailType": "Inventory Change",
+                            "Detail": json.dumps({
+                                "product_id": int(product_id),
+                                "product_name": name,
+                                "stock_quantity": stock_count
+                            })
+                        }
+                    ]
+                )
 
             return response(
                 200,

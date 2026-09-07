@@ -1,0 +1,5 @@
+{
+  "httpMethod": "POST",
+  "path": "/orders",
+  "body": "{\"customer_id\":1,\"items\":[{\"product_id\":7,\"quantity\":1}]}"
+}
