@@ -348,7 +348,6 @@ Resources:
   LowStockSubscription:
     Type: AWS::SNS::Subscription
     Condition: CreateLowStockSubscription
-    Condition: CreateLowStockSubscription
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail

@@ -162,28 +162,31 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify Auth Token Secret
-        env:
-          AUTH_TOKEN: ${{ secrets.CLOUDMART_AUTH_TOKEN }}
-
+      - name: Create Customer Token If Missing
         run: |
-          if [ -z "$AUTH_TOKEN" ]; then
-            echo "ERROR: CLOUDMART_AUTH_TOKEN secret is missing"
-            exit 1
+          if aws ssm get-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/auth/customer-token" \
+            >/dev/null 2>&1; then
+            echo "Customer token already exists in SSM"
+          else
+            CUSTOMER_TOKEN=$(openssl rand -hex 32)
+
+            aws ssm put-parameter \
+              --name "/cloudmart/${ENVIRONMENT}/auth/customer-token" \
+              --type "SecureString" \
+              --value "$CUSTOMER_TOKEN"
+
+            echo "Customer token created and stored in SSM"
           fi
-
-          echo "CLOUDMART_AUTH_TOKEN secret found"
-
-      - name: Store Auth Token in SSM
-        env:
-          AUTH_TOKEN: ${{ secrets.CLOUDMART_AUTH_TOKEN }}
-
+      - name: Verify Admin Token
         run: |
-          aws ssm put-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/auth/api-token" \
-            --type "SecureString" \
-            --value "$AUTH_TOKEN" \
-            --overwrite
+          aws ssm get-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/auth/admin-token" \
+            --with-decryption \
+            --query "Parameter.Name" \
+            --output text
+
+          echo "Admin token exists in SSM"
 
       - name: Validate Auth Template
         run: |
@@ -197,9 +200,10 @@ jobs:
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
-              AuthTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/api-token" \
-            --capabilities CAPABILITY_NAMED_IAM
-
+              CustomerTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/customer-token" \
+              AdminTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/admin-token" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
 
   # ============================================================
   # API / APPLICATION

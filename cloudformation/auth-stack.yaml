@@ -10,10 +10,15 @@ Parameters:
       - dev
       - prod
 
-  AuthTokenParameterName:
+  CustomerTokenParameterName:
     Type: String
-    Description: Name of the SecureString SSM parameter containing the API token
-    Default: /cloudmart/dev/auth/api-token
+    Description: SSM parameter containing the customer API token
+    Default: /cloudmart/dev/auth/customer-token
+
+  AdminTokenParameterName:
+    Type: String
+    Description: SSM parameter containing the admin API token
+    Default: /cloudmart/dev/auth/admin-token
 
 Resources:
 
@@ -41,7 +46,9 @@ Resources:
               - Effect: Allow
                 Action:
                   - ssm:GetParameter
-                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/api-token
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/customer-token
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/admin-token
 
         - PolicyName: AuthorizerCloudWatchLogs
           PolicyDocument:
@@ -66,7 +73,8 @@ Resources:
 
       Environment:
         Variables:
-          AUTH_TOKEN_PARAMETER: !Ref AuthTokenParameterName
+          CUSTOMER_TOKEN_PARAMETER: !Ref CustomerTokenParameterName
+          ADMIN_TOKEN_PARAMETER: !Ref AdminTokenParameterName
 
       Code:
         ZipFile: |
@@ -75,19 +83,20 @@ Resources:
 
           ssm = boto3.client("ssm")
 
-          PARAMETER_NAME = os.environ["AUTH_TOKEN_PARAMETER"]
+          CUSTOMER_TOKEN_PARAMETER = os.environ["CUSTOMER_TOKEN_PARAMETER"]
+          ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
 
 
-          def get_auth_token():
+          def get_token(parameter_name):
               response = ssm.get_parameter(
-                  Name=PARAMETER_NAME,
+                  Name=parameter_name,
                   WithDecryption=True
               )
               return response["Parameter"]["Value"]
 
 
-          def generate_policy(principal_id, effect, resource):
-              return {
+          def generate_policy(principal_id, effect, resource, role=None):
+              response = {
                   "principalId": principal_id,
                   "policyDocument": {
                       "Version": "2012-10-17",
@@ -101,14 +110,18 @@ Resources:
                   }
               }
 
+              if role:
+                  response["context"] = {
+                      "role": role
+                  }
+
+              return response
+
 
           def lambda_handler(event, context):
 
               method_arn = event.get("methodArn", "*")
 
-              # Allow all methods and resources belonging to this API stage.
-              # Example:
-              # arn:aws:execute-api:region:account:api-id/dev/*
               arn_parts = method_arn.split("/")
 
               if len(arn_parts) >= 2:
@@ -130,9 +143,16 @@ Resources:
                   provided_token = provided_token[7:].strip()
 
               try:
-                  expected_token = get_auth_token()
+                  customer_token = get_token(
+                      CUSTOMER_TOKEN_PARAMETER
+                  )
+
+                  admin_token = get_token(
+                      ADMIN_TOKEN_PARAMETER
+                  )
+
               except Exception as error:
-                  print(f"Failed to retrieve authentication token: {error}")
+                  print(f"Failed to retrieve authentication tokens: {error}")
 
                   return generate_policy(
                       "cloudmart-unauthorized",
@@ -140,11 +160,24 @@ Resources:
                       method_arn
                   )
 
-              if provided_token and provided_token == expected_token:
+              if provided_token == customer_token:
+                  print("Customer authenticated")
+
                   return generate_policy(
-                      "cloudmart-user",
+                      "cloudmart-customer",
                       "Allow",
-                      policy_resource
+                      policy_resource,
+                      "CUSTOMER"
+                  )
+
+              if provided_token == admin_token:
+                  print("Admin authenticated")
+
+                  return generate_policy(
+                      "cloudmart-admin",
+                      "Allow",
+                      policy_resource,
+                      "ADMIN"
                   )
 
               print("Authorization failed")
@@ -171,8 +204,14 @@ Outputs:
     Export:
       Name: !Sub CloudMart-${Environment}-AuthorizerFunctionInvokeArn
 
-  AuthTokenParameterName:
-    Description: SSM SecureString parameter containing the CloudMart API token
-    Value: !Ref AuthTokenParameterName
+  CustomerTokenParameterName:
+    Description: SSM parameter containing the CloudMart customer token
+    Value: !Ref CustomerTokenParameterName
     Export:
-      Name: !Sub CloudMart-${Environment}-AuthTokenParameterName
+      Name: !Sub CloudMart-${Environment}-CustomerTokenParameterName
+
+  AdminTokenParameterName:
+    Description: SSM parameter containing the CloudMart admin token
+    Value: !Ref AdminTokenParameterName
+    Export:
+      Name: !Sub CloudMart-${Environment}-AdminTokenParameterName
