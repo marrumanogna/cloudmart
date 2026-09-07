@@ -462,6 +462,27 @@ Resources:
         - Arn: !Ref OrderConfirmedTopic
           Id: OrderConfirmedSNSTarget
 
+          InputTransformer:
+            InputPathsMap:
+              order_id: "$.detail.order_id"
+              customer_id: "$.detail.customer_id"
+              total_amount: "$.detail.total_amount"
+              status: "$.detail.status"
+
+            InputTemplate: |
+              "Order Confirmed!
+
+              Hello,
+
+              Your CloudMart order has been successfully confirmed.
+
+              Order ID: <order_id>
+              Customer ID: <customer_id>
+              Total Amount: ₹<total_amount>
+              Status: <status>
+
+              Thank you for shopping with CloudMart!"
+
 
   OrderConfirmedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
