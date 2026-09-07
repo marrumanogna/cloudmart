@@ -424,6 +424,26 @@ Resources:
         - Arn: !Ref OrderPlacedTopic
           Id: OrderPlacedSNSTarget
 
+          InputTransformer:
+            InputPathsMap:
+              order_id: "$.detail.order_id"
+              customer_id: "$.detail.customer_id"
+
+            InputTemplate: |
+              "Order Placed!
+
+              Hello,
+
+              Your CloudMart order has been successfully placed.
+
+              Order ID: <order_id>
+              Customer ID: <customer_id>
+              Status: PLACED
+
+              We are processing your order and will keep you updated.
+
+              Thank you for shopping with CloudMart!"
+
 
   OrderPlacedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
@@ -539,6 +559,27 @@ Resources:
       Targets:
         - Arn: !Ref OrderFailedTopic
           Id: OrderFailedSNSTarget
+          InputTransformer:
+            InputPathsMap:
+              order_id: "$.detail.order_id"
+              customer_id: "$.detail.customer_id"
+              reason: "$.detail.reason"
+
+            InputTemplate: |
+              "Order Failed
+
+              Hello,
+
+              Unfortunately, we were unable to process your CloudMart order.
+
+              Order ID: <order_id>
+              Customer ID: <customer_id>
+              Reason: <reason>
+
+              Please try again or choose another product.
+
+              Thank you,
+              CloudMart Team"
 
 
   OrderFailedTopicPolicy:
