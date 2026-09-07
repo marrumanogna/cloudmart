@@ -10,17 +10,23 @@ events_client = boto3.client("events")
 
 
 def get_db_connection():
+    print("DEBUG: Starting get_db_connection")
+
+    print("DEBUG: Getting DB username from SSM")
     username = ssm.get_parameter(
         Name=os.environ["DB_USERNAME_PARAMETER"],
         WithDecryption=True
     )["Parameter"]["Value"]
 
+    print("DEBUG: Getting DB password from SSM")
     password = ssm.get_parameter(
         Name=os.environ["DB_PASSWORD_PARAMETER"],
         WithDecryption=True
     )["Parameter"]["Value"]
 
-    return pymysql.connect(
+    print("DEBUG: Connecting to RDS")
+
+    connection = pymysql.connect(
         host=os.environ["DB_HOST"],
         port=int(os.environ["DB_PORT"]),
         user=username,
@@ -29,6 +35,10 @@ def get_db_connection():
         connect_timeout=10,
         cursorclass=pymysql.cursors.DictCursor
     )
+
+    print("DEBUG: Connected to RDS successfully")
+
+    return connection
 
 
 def response(status_code, message, data=None):
@@ -50,6 +60,8 @@ def response(status_code, message, data=None):
 
 def publish_event(detail_type, detail):
     try:
+        print(f"DEBUG: Publishing EventBridge event: {detail_type}")
+
         events_client.put_events(
             Entries=[
                 {
@@ -61,6 +73,8 @@ def publish_event(detail_type, detail):
             ]
         )
 
+        print(f"DEBUG: EventBridge event published: {detail_type}")
+
     except Exception as e:
         print(json.dumps({
             "level": "ERROR",
@@ -71,10 +85,14 @@ def publish_event(detail_type, detail):
 
 
 def send_failed_order_to_sqs(order_data):
+    print("DEBUG: Sending failed order to SQS")
+
     sqs.send_message(
         QueueUrl=os.environ["FAILED_ORDERS_QUEUE_URL"],
         MessageBody=json.dumps(order_data, default=str)
     )
+
+    print("DEBUG: Failed order sent to SQS")
 
 
 def lambda_handler(event, context):
@@ -91,6 +109,8 @@ def lambda_handler(event, context):
             "DEBUG_MESSAGE_TYPE": str(type(message))
         }))
 
+        print("DEBUG: Validating processor action")
+
         if message.get("action") != "PROCESS_ORDER":
             return response(
                 400,
@@ -99,6 +119,9 @@ def lambda_handler(event, context):
 
         customer_id = message.get("customer_id")
         items = message.get("items")
+
+        print(f"DEBUG: customer_id = {customer_id}")
+        print(f"DEBUG: items = {items}")
 
         if not customer_id:
             return response(
@@ -112,13 +135,21 @@ def lambda_handler(event, context):
                 "items must be a non-empty list"
             )
 
+        print("DEBUG: Connecting to database")
+
         connection = get_db_connection()
+
+        print("DEBUG: Database connection established")
 
         # =====================================================
         # Validate Customer
         # =====================================================
 
+        print("DEBUG: Starting customer validation")
+
         with connection.cursor() as cursor:
+
+            print("DEBUG: Executing customer query")
 
             cursor.execute(
                 """
@@ -129,9 +160,15 @@ def lambda_handler(event, context):
                 (customer_id,)
             )
 
+            print("DEBUG: Customer query completed")
+
             customer = cursor.fetchone()
 
+            print(f"DEBUG: Customer result = {customer}")
+
         if not customer:
+
+            print("DEBUG: Customer not found")
 
             failed_data = {
                 "customer_id": customer_id,
@@ -151,12 +188,16 @@ def lambda_handler(event, context):
                 "Customer not found"
             )
 
+        print("DEBUG: Customer validation successful")
+
         # =====================================================
         # Validate Products and Stock
         # =====================================================
 
         total_amount = 0
         validated_items = []
+
+        print("DEBUG: Starting product and stock validation")
 
         with connection.cursor() as cursor:
 
@@ -165,7 +206,14 @@ def lambda_handler(event, context):
                 product_id = item.get("product_id")
                 quantity = int(item.get("quantity", 0))
 
+                print(
+                    f"DEBUG: Processing product_id={product_id}, "
+                    f"quantity={quantity}"
+                )
+
                 if not product_id or quantity <= 0:
+
+                    print("DEBUG: Invalid product_id or quantity")
 
                     connection.rollback()
 
@@ -187,6 +235,11 @@ def lambda_handler(event, context):
                         "Invalid product_id or quantity"
                     )
 
+                print(
+                    f"DEBUG: Executing FOR UPDATE product query "
+                    f"for product_id={product_id}"
+                )
+
                 cursor.execute(
                     """
                     SELECT
@@ -202,9 +255,24 @@ def lambda_handler(event, context):
                     (product_id,)
                 )
 
+                print(
+                    f"DEBUG: FOR UPDATE query completed "
+                    f"for product_id={product_id}"
+                )
+
                 product = cursor.fetchone()
 
+                print(
+                    f"DEBUG: Product result for product_id={product_id}: "
+                    f"{product}"
+                )
+
                 if not product:
+
+                    print(
+                        f"DEBUG: Product not found "
+                        f"for product_id={product_id}"
+                    )
 
                     connection.rollback()
 
@@ -227,7 +295,17 @@ def lambda_handler(event, context):
                         "Product not found"
                     )
 
+                print(
+                    f"DEBUG: Available stock for product_id={product_id}: "
+                    f"{product['stock_count']}"
+                )
+
                 if product["stock_count"] < quantity:
+
+                    print(
+                        f"DEBUG: Insufficient stock "
+                        f"for product_id={product_id}"
+                    )
 
                     connection.rollback()
 
@@ -258,17 +336,34 @@ def lambda_handler(event, context):
 
                 total_amount += item_total
 
+                print(
+                    f"DEBUG: Item total for product_id={product_id}: "
+                    f"{item_total}"
+                )
+
                 validated_items.append({
                     "product_id": product_id,
                     "quantity": quantity,
                     "unit_price": product["price"]
                 })
 
+                print(
+                    f"DEBUG: Product validation completed "
+                    f"for product_id={product_id}"
+                )
+
+        print("DEBUG: Product and stock validation completed")
+        print(f"DEBUG: Total amount = {total_amount}")
+
         # =====================================================
         # Create Order
         # =====================================================
 
+        print("DEBUG: Starting order creation")
+
         with connection.cursor() as cursor:
+
+            print("DEBUG: Inserting order")
 
             cursor.execute(
                 """
@@ -291,13 +386,22 @@ def lambda_handler(event, context):
                 )
             )
 
+            print("DEBUG: Order INSERT completed")
+
             order_id = cursor.lastrowid
+
+            print(f"DEBUG: New order_id = {order_id}")
 
             # =================================================
             # Insert Order Items
             # =================================================
 
             for item in validated_items:
+
+                print(
+                    f"DEBUG: Inserting order item "
+                    f"for product_id={item['product_id']}"
+                )
 
                 cursor.execute(
                     """
@@ -324,9 +428,19 @@ def lambda_handler(event, context):
                     )
                 )
 
+                print(
+                    f"DEBUG: Order item INSERT completed "
+                    f"for product_id={item['product_id']}"
+                )
+
                 # =============================================
                 # Deduct Inventory
                 # =============================================
+
+                print(
+                    f"DEBUG: Updating inventory "
+                    f"for product_id={item['product_id']}"
+                )
 
                 cursor.execute(
                     """
@@ -343,7 +457,15 @@ def lambda_handler(event, context):
                     )
                 )
 
+                print(
+                    f"DEBUG: Inventory UPDATE completed "
+                    f"for product_id={item['product_id']}, "
+                    f"rowcount={cursor.rowcount}"
+                )
+
                 if cursor.rowcount != 1:
+
+                    print("DEBUG: Inventory deduction failed")
 
                     connection.rollback()
 
@@ -370,6 +492,11 @@ def lambda_handler(event, context):
             # Update Order Status
             # =================================================
 
+            print(
+                f"DEBUG: Updating order status to CONFIRMED "
+                f"for order_id={order_id}"
+            )
+
             cursor.execute(
                 """
                 UPDATE orders
@@ -379,9 +506,16 @@ def lambda_handler(event, context):
                 (order_id,)
             )
 
+            print("DEBUG: Order status UPDATE completed")
+
             # =================================================
             # Insert History
             # =================================================
+
+            print(
+                f"DEBUG: Inserting history "
+                f"for order_id={order_id}"
+            )
 
             cursor.execute(
                 """
@@ -408,11 +542,17 @@ def lambda_handler(event, context):
                 )
             )
 
+            print("DEBUG: History INSERT completed")
+
         # =====================================================
         # Commit Transaction
         # =====================================================
 
+        print(f"DEBUG: Starting database COMMIT for order_id={order_id}")
+
         connection.commit()
+
+        print(f"DEBUG: Database COMMIT completed for order_id={order_id}")
 
         # =====================================================
         # OrderConfirmed Event
@@ -424,6 +564,8 @@ def lambda_handler(event, context):
             "total_amount": total_amount,
             "status": "CONFIRMED"
         }
+
+        print("DEBUG: Preparing OrderConfirmed event")
 
         publish_event(
             "OrderConfirmed",
@@ -450,8 +592,12 @@ def lambda_handler(event, context):
 
     except Exception as e:
 
+        print("DEBUG: Exception occurred in Order Processor")
+
         if connection:
+            print("DEBUG: Rolling back database transaction")
             connection.rollback()
+            print("DEBUG: Database rollback completed")
 
         failed_data = {
             "order_id": order_id,
@@ -468,7 +614,12 @@ def lambda_handler(event, context):
         }))
 
         try:
+
+            print("DEBUG: Sending failed order to SQS")
+
             send_failed_order_to_sqs(failed_data)
+
+            print("DEBUG: Publishing OrderFailed event")
 
             publish_event(
                 "OrderFailed",
@@ -495,5 +646,10 @@ def lambda_handler(event, context):
 
     finally:
 
+        print("DEBUG: Entering finally block")
+
         if connection:
+            print("DEBUG: Closing database connection")
             connection.close()
+            print("DEBUG: Database connection closed")
+
