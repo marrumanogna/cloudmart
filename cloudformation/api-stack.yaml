@@ -371,10 +371,10 @@ Resources:
       Endpoint: !Ref LowStockEmail
       TopicArn: !Ref OrderConfirmedTopic
 
-  # ============================================================
+   # ============================================================
   # M3 INVENTORY CHANGE EVENTBRIDGE RULE
   # ============================================================
-
+  
   InventoryChangeRule:
     Type: AWS::Events::Rule
     Properties:
@@ -386,6 +386,40 @@ Resources:
           - cloudmart.product
         detail-type:
           - Inventory Change
+
+      Targets:
+        - Arn: !Ref LowStockTopic
+          Id: LowStockSNSTarget
+
+          InputTransformer:
+            InputPathsMap:
+              product_id: "$.detail.product_id"
+              product_name: "$.detail.product_name"
+              stock_quantity: "$.detail.stock_quantity"
+
+            InputTemplate: '"CloudMart Low Stock Alert!\n\nProduct ID: <product_id>\nProduct: <product_name>\nRemaining Stock: <stock_quantity>\n\nPlease restock this product."'
+
+
+  LowStockTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !GetAtt LowStockTopic.TopicArn
+
+      PolicyDocument:
+        Version: '2012-10-17'
+
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action:
+              - sns:Publish
+            Resource: !GetAtt LowStockTopic.TopicArn
+
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt InventoryChangeRule.Arn
 
   # ============================================================
   # M4 ORDER PLACED SNS
