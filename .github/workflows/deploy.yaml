@@ -9,6 +9,8 @@ on:
       - 'product-lambda/**'
       - 'order-lambda/**'
       - 'order-processor-lambda/**'
+      - 'database-init-lambda/**'
+      - 'database/**'
       - '.github/workflows/deploy.yaml'
 
   workflow_dispatch:
@@ -60,6 +62,10 @@ jobs:
   # DATA
   # ============================================================
 
+  # ============================================================
+  # DATA
+  # ============================================================
+
   deploy-data:
     name: Deploy Data Stack
     needs: deploy-network
@@ -75,13 +81,45 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Validate Data Template
+      # --------------------------------------------------------
+      # Get Artifacts Bucket
+      # --------------------------------------------------------
+
+      - name: Get Artifacts Bucket
+        run: |
+          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
+            --output text 2>/dev/null || true)
+
+          if [ -z "$ARTIFACTS_BUCKET" ] || [ "$ARTIFACTS_BUCKET" = "None" ]; then
+            echo "Artifacts bucket does not exist yet."
+            echo "The data stack creates the bucket, so packaging cannot use it before first deployment."
+          else
+            echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
+          fi
+
+      # --------------------------------------------------------
+      # First deployment / RDS + S3
+      # --------------------------------------------------------
+
+      - name: Check Data Stack
+        id: check-data-stack
+        run: |
+          if aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy Data Stack First Time
+        if: steps.check-data-stack.outputs.exists == 'false'
         run: |
           aws cloudformation validate-template \
             --template-body file://cloudformation/data-stack.yaml
 
-      - name: Deploy Data Stack
-        run: |
           aws cloudformation deploy \
             --template-file cloudformation/data-stack.yaml \
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
@@ -89,7 +127,65 @@ jobs:
               Environment=${{ env.ENVIRONMENT }} \
               DBUsername="${{ secrets.DB_USERNAME }}" \
               DBPassword="${{ secrets.DB_PASSWORD }}" \
-            --capabilities CAPABILITY_NAMED_IAM
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
+
+      # --------------------------------------------------------
+      # Get bucket after first deployment
+      # --------------------------------------------------------
+
+      - name: Get Artifacts Bucket After Deployment
+        run: |
+          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
+            --output text)
+
+          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
+
+          echo "Artifacts bucket:"
+          echo "$ARTIFACTS_BUCKET"
+
+      # --------------------------------------------------------
+      # Package Database Init Lambda
+      # --------------------------------------------------------
+
+      - name: Package Data SAM Template
+        run: |
+          aws cloudformation package \
+            --template-file cloudformation/data-stack.yaml \
+            --s3-bucket "$ARTIFACTS_BUCKET" \
+            --output-template-file cloudformation/data-stack-packaged.yaml \
+            --region ${{ env.AWS_REGION }}
+
+      # --------------------------------------------------------
+      # Validate packaged template
+      # --------------------------------------------------------
+
+      - name: Validate Packaged Data Template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/data-stack-packaged.yaml
+
+      # --------------------------------------------------------
+      # Deploy packaged Data Stack
+      # --------------------------------------------------------
+
+      - name: Deploy Data Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/data-stack-packaged.yaml \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
+
+      # --------------------------------------------------------
+      # Store Database Parameters in SSM
+      # --------------------------------------------------------
 
       - name: Store Database Parameters in SSM
         env:
@@ -113,6 +209,18 @@ jobs:
             --output text)
 
           aws ssm put-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/database/username" \
+            --type "SecureString" \
+            --value "$DB_USERNAME" \
+            --overwrite
+
+          aws ssm put-parameter \
+            --name "/cloudmart/${ENVIRONMENT}/database/password" \
+            --type "SecureString" \
+            --value "$DB_PASSWORD" \
+            --overwrite
+
+          aws ssm put-parameter \
             --name "/cloudmart/${ENVIRONMENT}/rds/host" \
             --type "String" \
             --value "$RDS_HOST" \
@@ -130,17 +238,19 @@ jobs:
             --value "$DB_NAME" \
             --overwrite
 
-          aws ssm put-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/rds/username" \
-            --type "SecureString" \
-            --value "$DB_USERNAME" \
-            --overwrite
+          echo "Database parameters stored in SSM."
+  # --------------------------------------------------------
+  # Run Database Initialization Lambda
+  # --------------------------------------------------------
 
-          aws ssm put-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/rds/password" \
-            --type "SecureString" \
-            --value "$DB_PASSWORD" \
-            --overwrite
+      - name: Initialize CloudMart Database
+        run: |
+          aws lambda invoke \
+            --function-name CloudMart-DatabaseInit-${{ env.ENVIRONMENT }} \
+            --region ${{ env.AWS_REGION }} \
+            database-init-response.json
+
+          cat database-init-response.json
 
 
   # ============================================================

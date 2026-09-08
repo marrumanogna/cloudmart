@@ -1,4 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
 Description: CloudMart Data Stack
 
 Parameters:
@@ -23,106 +25,338 @@ Parameters:
     NoEcho: true
     MinLength: 8
 
+
 Resources:
+
+  # ============================================================
+  # RDS SUBNET GROUP
+  # ============================================================
 
   RdsSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
       DBSubnetGroupDescription: CloudMart RDS subnet group
+
       SubnetIds:
         - Fn::ImportValue:
             !Sub CloudMart-${Environment}-PrivateSubnetId
+
         - Fn::ImportValue:
             !Sub CloudMart-${Environment}-PrivateSubnet2Id
+
       Tags:
         - Key: Name
           Value: !Sub cloudmart-rds-subnet-group-${Environment}
+
+
+  # ============================================================
+  # RDS MYSQL
+  # ============================================================
 
   CloudMartRDS:
     Type: AWS::RDS::DBInstance
     Properties:
       DBInstanceIdentifier: !Sub cloudmart-mysql-${Environment}
+
       Engine: mysql
+
       DBName: !Ref DBName
+
       MasterUsername: !Ref DBUsername
+
       MasterUserPassword: !Ref DBPassword
+
       DBInstanceClass: db.t3.micro
+
       AllocatedStorage: 20
+
       StorageType: gp3
+
       Port: 3306
+
       PubliclyAccessible: false
+
       MultiAZ: false
+
       DBSubnetGroupName: !Ref RdsSubnetGroup
+
       VPCSecurityGroups:
         - Fn::ImportValue:
             !Sub CloudMart-${Environment}-RdsSecurityGroupId
+
       BackupRetentionPeriod: 1
+
       DeletionProtection: false
+
       DeleteAutomatedBackups: true
+
       Tags:
         - Key: Name
           Value: !Sub cloudmart-rds-${Environment}
 
+
+  # ============================================================
+  # ARTIFACTS S3 BUCKET
+  # ============================================================
+
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Properties:
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+
       Tags:
         - Key: Name
           Value: !Sub cloudmart-artifacts-${Environment}
 
+
+  # ============================================================
+  # REPORTS S3 BUCKET
+  # ============================================================
+
   ReportsBucket:
     Type: AWS::S3::Bucket
     Properties:
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+
       Tags:
         - Key: Name
           Value: !Sub cloudmart-reports-${Environment}
 
+
+  # ============================================================
+  # DATABASE INIT LAMBDA IAM ROLE
+  # ============================================================
+
+  DatabaseInitLambdaRole:
+    Type: AWS::IAM::Role
+
+    Properties:
+
+      RoleName: !Sub CloudMart-DatabaseInitLambda-${Environment}
+
+      AssumeRolePolicyDocument:
+
+        Version: '2012-10-17'
+
+        Statement:
+
+          - Effect: Allow
+
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+
+            Action:
+              - sts:AssumeRole
+
+
+      Policies:
+
+        - PolicyName: DatabaseInitPolicy
+
+          PolicyDocument:
+
+            Version: '2012-10-17'
+
+            Statement:
+
+              # ------------------------------------------------
+              # SSM
+              # ------------------------------------------------
+
+              - Effect: Allow
+
+                Action:
+                  - ssm:GetParameter
+
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/database/*
+
+
+              # ------------------------------------------------
+              # CLOUDWATCH LOGS
+              # ------------------------------------------------
+
+              - Effect: Allow
+
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+
+                Resource: "*"
+
+
+              # ------------------------------------------------
+              # VPC NETWORK INTERFACES
+              # ------------------------------------------------
+
+              - Effect: Allow
+
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+
+                Resource: "*"
+
+
+  # ============================================================
+  # DATABASE INIT LAMBDA
+  # ============================================================
+
+  DatabaseInitLambda:
+    Type: AWS::Serverless::Function
+
+    Properties:
+
+      FunctionName: !Sub CloudMart-DatabaseInit-${Environment}
+
+      Runtime: python3.13
+
+      Handler: index.lambda_handler
+
+      Role: !GetAtt DatabaseInitLambdaRole.Arn
+
+      Timeout: 300
+
+      MemorySize: 256
+
+      CodeUri: ../database-init-lambda/
+
+      VpcConfig:
+
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              !Sub CloudMart-${Environment}-LambdaSecurityGroupId
+
+        SubnetIds:
+          - Fn::ImportValue:
+              !Sub CloudMart-${Environment}-PrivateSubnetId
+
+      Environment:
+
+        Variables:
+
+          DB_HOST:
+            !GetAtt CloudMartRDS.Endpoint.Address
+
+          DB_NAME:
+            !Ref DBName
+
+          DB_USER_PARAMETER:
+            !Sub /cloudmart/${Environment}/database/username
+
+          DB_PASSWORD_PARAMETER:
+            !Sub /cloudmart/${Environment}/database/password
+
+
+  # ============================================================
+  # DATABASE INIT LAMBDA LOG GROUP
+  # ============================================================
+
+  DatabaseInitLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+
+    Properties:
+
+      LogGroupName:
+        !Sub /aws/lambda/CloudMart-DatabaseInit-${Environment}
+
+      RetentionInDays: 14
+
+
+# ==============================================================
+# OUTPUTS
+# ==============================================================
+
 Outputs:
 
   RdsEndpoint:
-    Value: !GetAtt CloudMartRDS.Endpoint.Address
+
+    Value:
+      !GetAtt CloudMartRDS.Endpoint.Address
+
     Export:
-      Name: !Sub CloudMart-${Environment}-RdsEndpoint
+      Name:
+        !Sub CloudMart-${Environment}-RdsEndpoint
+
 
   RdsPort:
-    Value: !GetAtt CloudMartRDS.Endpoint.Port
+
+    Value:
+      !GetAtt CloudMartRDS.Endpoint.Port
+
     Export:
-      Name: !Sub CloudMart-${Environment}-RdsPort
+      Name:
+        !Sub CloudMart-${Environment}-RdsPort
+
 
   ArtifactsBucketName:
-    Value: !Ref ArtifactsBucket
+
+    Value:
+      !Ref ArtifactsBucket
+
     Export:
-      Name: !Sub CloudMart-${Environment}-ArtifactsBucketName
+      Name:
+        !Sub CloudMart-${Environment}-ArtifactsBucketName
+
 
   ReportsBucketName:
-    Value: !Ref ReportsBucket
+
+    Value:
+      !Ref ReportsBucket
+
     Export:
-      Name: !Sub CloudMart-${Environment}-ReportsBucketName
+      Name:
+        !Sub CloudMart-${Environment}-ReportsBucketName
+
 
   DBName:
-    Value: !Ref DBName
+
+    Value:
+      !Ref DBName
+
     Export:
-      Name: !Sub CloudMart-${Environment}-DBName
+      Name:
+        !Sub CloudMart-${Environment}-DBName
+
 
   DBUsername:
-    Value: !Ref DBUsername
+
+    Value:
+      !Ref DBUsername
+
     Export:
-      Name: !Sub CloudMart-${Environment}-DBUsername
+      Name:
+        !Sub CloudMart-${Environment}-DBUsername
+
+
+  DatabaseInitLambdaArn:
+
+    Value:
+      !GetAtt DatabaseInitLambda.Arn
+
+    Export:
+      Name:
+        !Sub CloudMart-${Environment}-DatabaseInitLambdaArn
