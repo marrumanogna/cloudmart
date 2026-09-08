@@ -1,0 +1,49 @@
+[
+  {
+    "ResourceType": "AWS::IAM::Role",
+    "LogicalResourceId": "GitHubActionsRole",
+    "ResourceIdentifier": {
+      "RoleName": "CloudMart-GitHubActions-Role"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::RolePolicy",
+    "LogicalResourceId": "GitHubActionsApiStackPolicy",
+    "ResourceIdentifier": {
+      "RoleName": "CloudMart-GitHubActions-Role",
+      "PolicyName": "api-stack"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::RolePolicy",
+    "LogicalResourceId": "GitHubActionsAuthSSMPolicy",
+    "ResourceIdentifier": {
+      "RoleName": "CloudMart-GitHubActions-Role",
+      "PolicyName": "CloudMartAuthSSMAccess"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::RolePolicy",
+    "LogicalResourceId": "GitHubActionsEC2InstanceProfilePolicy",
+    "ResourceIdentifier": {
+      "RoleName": "CloudMart-GitHubActions-Role",
+      "PolicyName": "CloudMartEC2InstanceProfileDeployment"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::RolePolicy",
+    "LogicalResourceId": "GitHubActionsDeploymentPolicy",
+    "ResourceIdentifier": {
+      "RoleName": "CloudMart-GitHubActions-Role",
+      "PolicyName": "CloudMartGitHubActionsDeploymentPolicy"
+    }
+  },
+  {
+    "ResourceType": "AWS::IAM::RolePolicy",
+    "LogicalResourceId": "GitHubActionsSQSDeploymentPolicy",
+    "ResourceIdentifier": {
+      "RoleName": "CloudMart-GitHubActions-Role",
+      "PolicyName": "CloudMartSQSDeployment"
+    }
+  }
+]

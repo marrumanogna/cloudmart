@@ -179,7 +179,54 @@ Resources:
             Version: '2012-10-17'
 
             Statement:
+  
+  # ============================================================
+  # DATABASE INIT LAMBDA IAM ROLE
+  # ============================================================
 
+  DatabaseInitLambdaRole:
+    Type: AWS::IAM::Role
+
+    Properties:
+
+      RoleName: !Sub CloudMart-DatabaseInitLambda-${Environment}
+
+      AssumeRolePolicyDocument:
+
+        Version: '2012-10-17'
+
+        Statement:
+
+          - Effect: Allow
+
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+
+            Action:
+              - sts:AssumeRole
+
+
+      Policies:
+
+        - PolicyName: DatabaseInitPolicy
+
+          PolicyDocument:
+
+            Version: '2012-10-17'
+
+            Statement:
+ 
+              # ------------------------------------------------
+              # SSM
+              # ------------------------------------------------
+
+              - Effect: Allow
+
+                Action:
+                  - ssm:GetParameter
+
+ 
               # ------------------------------------------------
               # SSM
               # ------------------------------------------------
@@ -270,6 +317,22 @@ Resources:
           DB_PASSWORD_PARAMETER:
             !Sub /cloudmart/${Environment}/database/password
 
+  DatabaseInitLambdaInvokePolicy:
+  
+    Type: AWS::Serverless::Function
+    
+    Properties:
+      PolicyName: CloudMart-DatabaseInitLambdaInvoke
+      Roles:
+        - CloudMart-GitHubActions-Role
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:CloudMart-DatabaseInit-${Environment}
 
   # ============================================================
   # DATABASE INIT LAMBDA LOG GROUP

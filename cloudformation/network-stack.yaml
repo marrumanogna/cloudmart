@@ -246,6 +246,7 @@ Resources:
       RoleName: !Ref GitHubActionsRole
       PolicyDocument:
         Version: '2012-10-17'
+        
         Statement:
 
           - Sid: CloudFormationDeployment
@@ -307,7 +308,11 @@ Resources:
               - ec2:DescribeVpcEndpoints
               - ec2:ModifyVpcEndpoint
             Resource: "*"
-
+          - Sid: LambdaInvokePermission
+            Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:CloudMart-DatabaseInit-${Environment}
           - Sid: RDSDeployment
             Effect: Allow
             Action:
