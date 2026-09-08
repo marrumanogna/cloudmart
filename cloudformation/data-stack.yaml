@@ -179,63 +179,24 @@ Resources:
             Version: '2012-10-17'
 
             Statement:
-  
-  # ============================================================
-  # DATABASE INIT LAMBDA IAM ROLE
-  # ============================================================
-
-  DatabaseInitLambdaRole:
-    Type: AWS::IAM::Role
-
-    Properties:
-
-      RoleName: !Sub CloudMart-DatabaseInitLambda-${Environment}
-
-      AssumeRolePolicyDocument:
-
-        Version: '2012-10-17'
-
-        Statement:
-
-          - Effect: Allow
-
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-
-            Action:
-              - sts:AssumeRole
-
-
-      Policies:
-
-        - PolicyName: DatabaseInitPolicy
-
-          PolicyDocument:
-
-            Version: '2012-10-17'
-
-            Statement:
  
               # ------------------------------------------------
               # SSM
               # ------------------------------------------------
 
               - Effect: Allow
-
                 Action:
                   - ssm:GetParameter
-
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/database/*
  
               # ------------------------------------------------
               # SSM
               # ------------------------------------------------
 
               - Effect: Allow
-
                 Action:
                   - ssm:GetParameter
-
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/database/*
 
@@ -319,8 +280,8 @@ Resources:
 
   DatabaseInitLambdaInvokePolicy:
   
-    Type: AWS::Serverless::Function
-    
+    Type: AWS::IAM::Policy
+
     Properties:
       PolicyName: CloudMart-DatabaseInitLambdaInvoke
       Roles:
