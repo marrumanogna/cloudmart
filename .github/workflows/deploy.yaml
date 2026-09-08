@@ -229,11 +229,20 @@ jobs:
           aws cloudformation validate-template \
             --template-body file://cloudformation/api-stack.yaml
 
+      - name: Get Artifacts Bucket
+        run: |
+          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
+            --output text)
+
+          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
+
       - name: Package API SAM Template
         run: |
           aws cloudformation package \
             --template-file cloudformation/api-stack.yaml \
-            --s3-bucket cloudmart-data-dev-artifactsbucket-sa0b9hgkhvza \
+            --s3-bucket "$ARTIFACTS_BUCKET" \
             --output-template-file cloudformation/api-stack-packaged.yaml \
             --region ${{ env.AWS_REGION }}
 
