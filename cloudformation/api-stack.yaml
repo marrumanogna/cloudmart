@@ -30,7 +30,59 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub cloudmart-failed-orders-${Environment}
+  # ============================================================
+  # CUSTOMER LAMBDA ROLE
+  # ============================================================
 
+  CustomerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub cloudmart-customer-lambda-role-${Environment}
+
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+      Policies:
+
+        - PolicyName: CustomerLambdaSSM
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+
+        - PolicyName: CustomerLambdaCloudWatch
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+        - PolicyName: CustomerLambdaVpcAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeSubnets
+                  - ec2:DeleteNetworkInterface
+                Resource: '*'
   # ============================================================
   # PRODUCT LAMBDA ROLE
   # ============================================================
@@ -596,7 +648,45 @@ Resources:
               ArnEquals:
                 aws:SourceArn: !GetAtt OrderFailedRule.Arn
 
+   # ============================================================
+  # CUSTOMER LAMBDA
+  # ============================================================
 
+  CustomerLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub cloudmart-customer-${Environment}
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt CustomerLambdaRole.Arn
+      Timeout: 15
+      MemorySize: 256
+
+      VpcConfig:
+        SubnetIds:
+          - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnetId
+          - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnet2Id
+
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub CloudMart-${Environment}-LambdaSecurityGroupId
+
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+
+          DB_HOST:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
+
+          DB_PORT:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
+
+          DB_NAME:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
+
+          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
+          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+
+      CodeUri: ../customer-lambda/package/
   # ============================================================
   # PRODUCT LAMBDA
   # ============================================================
@@ -959,10 +1049,49 @@ Resources:
             - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
             - FunctionArn: !GetAtt OrderLambda.Arn
 
+  # ============================================================
+  # /customers
+  # ============================================================
 
+  CustomersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CloudMartApi
+      ParentId: !GetAtt CloudMartApi.RootResourceId
+      PathPart: customers
+
+
+  CustomersPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CloudMartApi
+      ResourceId: !Ref CustomersResource
+      HttpMethod: POST
+
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref CloudMartAuthorizer
+
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+
+        Uri:
+          Fn::Sub:
+            - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+            - FunctionArn: !GetAtt CustomerLambda.Arn
   # ============================================================
   # LAMBDA PERMISSIONS
   # ============================================================
+
+  CustomerLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CustomerLambda
+      Principal: apigateway.amazonaws.com
+
+      SourceArn:
+        !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${CloudMartApi}/*/*
 
   ProductLambdaApiPermission:
     Type: AWS::Lambda::Permission
@@ -1000,6 +1129,7 @@ Resources:
       - ProductIdPutMethod
       - ProductIdDeleteMethod
       - OrdersPostMethod
+      - CustomersPostMethod
 
     Properties:
       RestApiId: !Ref CloudMartApi
