@@ -652,7 +652,7 @@ Resources:
       Runtime: python3.11
       Handler: index.lambda_handler
       Role: !GetAtt OrderLambdaRole.Arn
-      Timeout: 15
+      Timeout: 60
       MemorySize: 256
 
       VpcConfig:
