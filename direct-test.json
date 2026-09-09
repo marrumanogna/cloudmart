@@ -1,4 +1,0 @@
-{
-  "httpMethod": "POST",
-  "body": "{\"name\":\"Direct Low Stock Test\",\"description\":\"Testing\",\"price\":100,\"category\":\"Testing\",\"stock_count\":1}"
-}

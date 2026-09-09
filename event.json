@@ -1,8 +1,0 @@
-[
-  {
-    "EventBusName": "cloudmart-dev-event-bus",
-    "Source": "cloudmart.product",
-    "DetailType": "Inventory Change",
-    "Detail": "{\"product_id\":31,\"product_name\":\"Low Stock Test Product\",\"stock_quantity\":2}"
-  }
-]
