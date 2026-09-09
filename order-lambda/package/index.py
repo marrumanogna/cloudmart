@@ -209,9 +209,7 @@ def lambda_handler(event, context):
         # =====================================================
         elif method == "GET":
 
-            path_parameter_id = event.get(
-                "pathParameters", {}
-            ).get("id")
+            path_parameter_id = (event.get("pathParameters") or {}).get("id")
 
             conn = get_db_connection()
             cursor = conn.cursor()
