@@ -1179,7 +1179,7 @@ Resources:
 
      Properties:
       RestApiId: !Ref CloudMartApi
-      Description: !Sub CloudMart API deployment for ${Environment}
+      Description: !Sub CloudMart API deployment for ${Environment} v2
 
 
   CloudMartApiStage:
