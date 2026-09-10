@@ -418,6 +418,8 @@ Resources:
 
   OrderConfirmedEmailSubscription:
     Type: AWS::SNS::Subscription
+    Condition: CreateLowStockSubscription
+    DeletionPolicy: Delete
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail
@@ -1072,6 +1074,7 @@ Resources:
           Fn::Sub:
             - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
             - FunctionArn: !GetAtt OrderLambda.Arn
+
   OrdersPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
