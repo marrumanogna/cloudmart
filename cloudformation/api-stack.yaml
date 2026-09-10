@@ -1164,18 +1164,20 @@ Resources:
   # ============================================================
 
   CloudMartApiDeployment:
-    Type: AWS::ApiGateway::Deployment
+     Type: AWS::ApiGateway::Deployment
 
-    DependsOn:
+     DependsOn:
       - ProductsGetMethod
       - ProductsPostMethod
       - ProductIdGetMethod
       - ProductIdPutMethod
       - ProductIdDeleteMethod
+      - OrdersGetMethod
+      - OrderIdGetMethod
       - OrdersPostMethod
       - CustomersPostMethod
 
-    Properties:
+     Properties:
       RestApiId: !Ref CloudMartApi
       Description: !Sub CloudMart API deployment for ${Environment}
 
