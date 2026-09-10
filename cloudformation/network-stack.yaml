@@ -29,7 +29,9 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: repo:marrumanogna/cloudmart:ref:refs/heads/main
+                token.actions.githubusercontent.com:sub:
+                  - repo:marrumanogna/cloudmart:ref:refs/heads/main
+                  - repo:marrumanogna/cloudmart:ref:refs/heads/milestone-4
   GitHubActionsApiStackPolicy:
     Type: AWS::IAM::RolePolicy
     DeletionPolicy: Retain
