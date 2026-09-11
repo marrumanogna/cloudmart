@@ -30,8 +30,7 @@ Resources:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
                 token.actions.githubusercontent.com:sub:
-                  - repo:marrumanogna/cloudmart:ref:refs/heads/main
-                  - repo:marrumanogna/cloudmart:ref:refs/heads/milestone-4
+                  - "repo:marrumanogna@223441351/cloudmart@1341672607:ref:refs/heads/*"
   GitHubActionsApiStackPolicy:
     Type: AWS::IAM::RolePolicy
     DeletionPolicy: Retain
@@ -772,5 +771,6 @@ Outputs:
     Value: !Ref VpcEndpointSecurityGroup
     Export:
       Name: !Sub CloudMart-${Environment}-VpcEndpointSecurityGroupId
+
 
 
