@@ -22,7 +22,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+              Federated: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action:
               - sts:AssumeRoleWithWebIdentity
             Condition:
@@ -772,3 +772,5 @@ Outputs:
     Value: !Ref VpcEndpointSecurityGroup
     Export:
       Name: !Sub CloudMart-${Environment}-VpcEndpointSecurityGroupId
+
+
