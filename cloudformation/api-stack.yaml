@@ -397,17 +397,6 @@ Resources:
       TopicName: !Sub cloudmart-low-stock-${Environment}
 
 
-  LowStockSubscription:
-    Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      Protocol: email
-      Endpoint: !Ref LowStockEmail
-      TopicArn: !Ref LowStockTopic
-
-
   # ============================================================
   # M4 ORDER CONFIRMATION SNS
   # ============================================================
@@ -418,17 +407,6 @@ Resources:
       TopicName: !Sub cloudmart-order-confirmed-${Environment}
 
 
-  OrderConfirmedEmailSubscription:
-    Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      Protocol: email
-      Endpoint: !Ref LowStockEmail
-      TopicArn: !Ref OrderConfirmedTopic
-
-   # ============================================================
   # M3 INVENTORY CHANGE EVENTBRIDGE RULE
   # ============================================================
   
@@ -486,17 +464,6 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub cloudmart-order-placed-${Environment}
-
-
-  OrderPlacedSubscriptionV3:
-    Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      Protocol: email
-      Endpoint: !Ref LowStockEmail
-      TopicArn: !Ref OrderPlacedTopic
 
 
   OrderPlacedRule:
@@ -599,17 +566,6 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub cloudmart-order-failed-${Environment}
-
-
-  OrderFailedSubscription:
-    Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      Protocol: email
-      Endpoint: !Ref LowStockEmail
-      TopicArn: !Ref OrderFailedTopic
 
 
   OrderFailedRule:
@@ -1271,6 +1227,7 @@ Outputs:
   LowStockTopicArn:
     Description: CloudMart low-stock SNS topic
     Value: !Ref LowStockTopic
+
 
 
 
