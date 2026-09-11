@@ -203,7 +203,124 @@ def lambda_handler(event, context):
                     "order_id": order_id
                 }
             )
+        # =====================================================
+        # PATCH /orders/{order_id}
+        # =====================================================
+        elif method == "PATCH":
 
+            path_parameters = event.get("pathParameters") or {}
+            path_parameter_id = (
+                path_parameters.get("order_id")
+                or path_parameters.get("id")
+            )
+
+            if not path_parameter_id:
+                return response(
+                    400,
+                    "Order ID is required"
+                )
+
+            try:
+                order_id = int(path_parameter_id)
+            except (ValueError, TypeError):
+                return response(
+                    400,
+                    "Invalid order ID"
+                )
+
+            body = json.loads(event.get("body") or "{}")
+            new_status = body.get("status")
+
+            if new_status != "CANCELLED":
+                return response(
+                    400,
+                    "Only status CANCELLED is supported"
+                )
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            try:
+                cursor.execute("""
+                    SELECT order_id, customer_id, status
+                    FROM orders
+                    WHERE order_id = %s
+                    FOR UPDATE
+                """, (order_id,))
+
+                order = cursor.fetchone()
+
+                if not order:
+                    return response(
+                        404,
+                        "Order not found"
+                    )
+
+                current_status = order["status"]
+
+                if current_status not in ("PLACED", "CONFIRMED"):
+                    return response(
+                        400,
+                        f"Order cannot be cancelled from status {current_status}"
+                    )
+
+                cursor.execute("""
+                    SELECT product_id, quantity
+                    FROM order_items
+                    WHERE order_id = %s
+                """, (order_id,))
+
+                items = cursor.fetchall()
+
+                for item in items:
+                    cursor.execute("""
+                        UPDATE products
+                        SET stock_count = stock_count + %s
+                        WHERE product_id = %s
+                          AND soft_delete IS NULL
+                    """, (
+                        item["quantity"],
+                        item["product_id"]
+                    ))
+
+                cursor.execute("""
+                    UPDATE orders
+                    SET status = 'CANCELLED'
+                    WHERE order_id = %s
+                """, (order_id,))
+
+                cursor.execute("""
+                    INSERT INTO history (
+                        order_id,
+                        old_status,
+                        new_status,
+                        changed_by
+                    )
+                    VALUES (%s, %s, 'CANCELLED', %s)
+                """, (
+                    order_id,
+                    current_status,
+                    "customer"
+                ))
+
+                conn.commit()
+
+                return response(
+                    200,
+                    "Order status updated successfully",
+                    {
+                        "order_id": order_id,
+                        "status": "CANCELLED"
+                    }
+                )
+
+            except Exception:
+                conn.rollback()
+                raise
+
+            finally:
+                cursor.close()
+                conn.close()
         # =====================================================
         # GET /orders OR GET /orders/{id}
         # =====================================================

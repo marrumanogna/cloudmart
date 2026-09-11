@@ -1037,6 +1037,28 @@ Resources:
             - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
             - FunctionArn: !GetAtt OrderLambda.Arn
 
+  OrderIdPatchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CloudMartApi
+      ResourceId: !Ref OrderIdResource
+      HttpMethod: PATCH
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref CloudMartAuthorizer
+
+      RequestParameters:
+        method.request.path.order_id: true
+
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+            - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+            - FunctionArn: !GetAtt OrderLambda.Arn
+
+  OrdersPostMethod:
+    Type: AWS::ApiGateway::Method
   OrdersPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -1136,6 +1158,7 @@ Resources:
       - ProductIdDeleteMethod
       - OrdersGetMethod
       - OrderIdGetMethod
+      - OrderIdPatchMethod
       - OrdersPostMethod
       - CustomersPostMethod
 
