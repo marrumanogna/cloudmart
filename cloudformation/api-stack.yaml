@@ -400,6 +400,8 @@ Resources:
   LowStockSubscription:
     Type: AWS::SNS::Subscription
     Condition: CreateLowStockSubscription
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail
@@ -419,7 +421,8 @@ Resources:
   OrderConfirmedEmailSubscription:
     Type: AWS::SNS::Subscription
     Condition: CreateLowStockSubscription
-    DeletionPolicy: Delete
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail
@@ -488,7 +491,8 @@ Resources:
   OrderPlacedSubscriptionV3:
     Type: AWS::SNS::Subscription
     Condition: CreateLowStockSubscription
-    DeletionPolicy: Delete
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail
@@ -600,6 +604,8 @@ Resources:
   OrderFailedSubscription:
     Type: AWS::SNS::Subscription
     Condition: CreateLowStockSubscription
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Protocol: email
       Endpoint: !Ref LowStockEmail
@@ -1265,3 +1271,6 @@ Outputs:
   LowStockTopicArn:
     Description: CloudMart low-stock SNS topic
     Value: !Ref LowStockTopic
+
+
+
