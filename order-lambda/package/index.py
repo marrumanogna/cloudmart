@@ -307,7 +307,7 @@ def lambda_handler(event, context):
 
                 return response(
                     200,
-                    "Order status updated successfully",
+                    "Order cancelled successfully",
                     {
                         "order_id": order_id,
                         "status": "CANCELLED"
