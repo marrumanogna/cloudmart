@@ -206,7 +206,7 @@ def lambda_handler(event, context):
         # =====================================================
         # PATCH /orders/{order_id}
         # =====================================================
-        elif method == "GET":
+        elif method == "PATCH":
 
             path_parameters = event.get("pathParameters") or {}
 
