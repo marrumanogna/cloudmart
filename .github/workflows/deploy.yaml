@@ -48,7 +48,13 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-
+      - name: Package Auth Template
+        run: |
+          aws cloudformation package \
+            --template-file cloudformation/auth-stack.yaml \
+            --s3-bucket cloudmart-artifacts-${{ env.ENVIRONMENT }} \
+            --output-template-file packaged-auth-stack.yaml \
+            --region ${{ env.AWS_REGION }}
       - name: Validate Network Template
         run: |
           aws cloudformation validate-template \
@@ -228,7 +234,7 @@ jobs:
       - name: Deploy Auth Stack
         run: |
           aws cloudformation deploy \
-            --template-file cloudformation/auth-stack.yaml \
+            --template-file packaged-auth-stack.yaml \
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
@@ -255,6 +261,13 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+      - name: Package Auth Template
+        run: |
+          aws cloudformation package \
+            --template-file cloudformation/auth-stack.yaml \
+            --s3-bucket cloudmart-artifacts-${{ env.ENVIRONMENT }} \
+            --output-template-file packaged-auth-stack.yaml \
+            --region ${{ env.AWS_REGION }}
 
       - name: Validate API Template
         run: |
