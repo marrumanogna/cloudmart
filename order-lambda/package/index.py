@@ -316,7 +316,7 @@ def lambda_handler(event, context):
 
             except Exception:
                 conn.rollback()
-                raise
+                raises
 
             finally:
                 cursor.close()
@@ -326,7 +326,9 @@ def lambda_handler(event, context):
         # =====================================================
         elif method == "GET":
 
-            path_parameter_id = (event.get("pathParameters") or {}).get("id")
+            path_parameter_id = (
+                event.get("pathParameters") or {}
+            ).get("order_id")
 
             conn = get_db_connection()
             cursor = conn.cursor()
