@@ -112,6 +112,148 @@ Resources:
 
       Code:
         ZipFile: |
+          import boto3
+          import os
+          import pymysql
+
+          ssm = boto3.client("ssm")
+
+          CUSTOMER_TOKEN_PARAMETER = os.environ["CUSTOMER_TOKEN_PARAMETER"]
+          ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
+
+          DB_HOST = os.environ["DB_HOST"]
+          DB_PORT = os.environ["DB_PORT"]
+          DB_NAME = os.environ["DB_NAME"]
+          DB_USERNAME_PARAMETER = os.environ["DB_USERNAME_PARAMETER"]
+          DB_PASSWORD_PARAMETER = os.environ["DB_PASSWORD_PARAMETER"]
+
+
+          def get_parameter(parameter_name):
+              response = ssm.get_parameter(
+                  Name=parameter_name,
+                  WithDecryption=True
+              )
+              return response["Parameter"]["Value"]
+
+
+          def generate_policy(principal_id, effect, resource, role=None, customer_id=None):
+              response = {
+                  "principalId": principal_id,
+                  "policyDocument": {
+                      "Version": "2012-10-17",
+                      "Statement": [
+                          {
+                              "Action": "execute-api:Invoke",
+                              "Effect": effect,
+                              "Resource": resource
+                          }
+                      ]
+                  }
+              }
+
+              context = {}
+
+              if role:
+                  context["role"] = role
+
+              if customer_id:
+                  context["customer_id"] = str(customer_id)
+
+              if context:
+                  response["context"] = context
+
+              return response
+
+
+          def get_customer_by_token(token):
+              username = get_parameter(DB_USERNAME_PARAMETER)
+              password = get_parameter(DB_PASSWORD_PARAMETER)
+
+              connection = pymysql.connect(
+                  host=DB_HOST,
+                  port=int(DB_PORT),
+                  user=username,
+                  password=password,
+                  database=DB_NAME,
+                  connect_timeout=5,
+                  cursorclass=pymysql.cursors.DictCursor
+              )
+
+              try:
+                  with connection.cursor() as cursor:
+                      cursor.execute(
+                          """
+                          SELECT customer_id
+                          FROM customers
+                          WHERE customer_token = %s
+                          """,
+                          (token,)
+                      )
+                      return cursor.fetchone()
+              finally:
+                  connection.close()
+
+
+          def lambda_handler(event, context):
+              method_arn = event.get("methodArn", "*")
+
+              arn_parts = method_arn.split("/")
+
+              if len(arn_parts) >= 2:
+                  policy_resource = f"{arn_parts[0]}/{arn_parts[1]}/*"
+              else:
+                  policy_resource = method_arn
+
+              provided_token = event.get("authorizationToken", "")
+
+              if not provided_token:
+                  headers = event.get("headers") or {}
+                  provided_token = headers.get("authorization", "")
+
+              if not provided_token:
+                  headers = event.get("headers") or {}
+                  provided_token = headers.get("Authorization", "")
+
+              if provided_token.lower().startswith("bearer "):
+                  provided_token = provided_token[7:].strip()
+
+              if not provided_token:
+                  raise Exception("Unauthorized")
+
+              try:
+                  admin_token = get_parameter(ADMIN_TOKEN_PARAMETER)
+
+                  if provided_token == admin_token:
+                      print("Admin authenticated")
+                      return generate_policy(
+                          "cloudmart-admin",
+                          "Allow",
+                          policy_resource,
+                          "ADMIN"
+                      )
+
+                  customer = get_customer_by_token(provided_token)
+
+                  if customer:
+                      print(f"Customer authenticated: {customer['customer_id']}")
+                      return generate_policy(
+                          f"cloudmart-customer-{customer['customer_id']}",
+                          "Allow",
+                          policy_resource,
+                          "CUSTOMER",
+                          customer["customer_id"]
+                      )
+
+              except Exception as error:
+                  print(f"Authorization error: {error}")
+                  return generate_policy(
+                      "cloudmart-unauthorized",
+                      "Deny",
+                      method_arn
+                  )
+
+              print("Authorization failed")
+              raise Exception("Unauthorized")
 
   AuthorizerLambdaPermission:
     Type: AWS::Lambda::Permission
