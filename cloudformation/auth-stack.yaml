@@ -21,6 +21,9 @@ Parameters:
     Default: /cloudmart/dev/auth/admin-token
 
 Resources:
+  
+
+  AuthorizerRole:
 
   AuthorizerRole:
     Type: AWS::IAM::Role

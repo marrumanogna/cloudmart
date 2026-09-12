@@ -68,10 +68,6 @@ jobs:
   # DATA
   # ============================================================
 
-  # ============================================================
-  # DATA
-  # ============================================================
-
   deploy-data:
     name: Deploy Data Stack
     needs: deploy-network
@@ -189,62 +185,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
 
-      # --------------------------------------------------------
-      # Store Database Parameters in SSM
-      # --------------------------------------------------------
 
-      - name: Store Database Parameters in SSM
-        env:
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-
-        run: |
-          RDS_HOST=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            --query "Stacks[0].Outputs[?OutputKey=='RdsEndpoint'].OutputValue" \
-            --output text)
-
-          RDS_PORT=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            --query "Stacks[0].Outputs[?OutputKey=='RdsPort'].OutputValue" \
-            --output text)
-
-          DB_NAME=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            --query "Stacks[0].Outputs[?OutputKey=='DBName'].OutputValue" \
-            --output text)
-
-          aws ssm put-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/database/username" \
-            --type "SecureString" \
-            --value "$DB_USERNAME" \
-            --overwrite
-
-          aws ssm put-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/database/password" \
-            --type "SecureString" \
-            --value "$DB_PASSWORD" \
-            --overwrite
-
-          aws ssm put-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/rds/host" \
-            --type "String" \
-            --value "$RDS_HOST" \
-            --overwrite
-
-          aws ssm put-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/rds/port" \
-            --type "String" \
-            --value "$RDS_PORT" \
-            --overwrite
-
-          aws ssm put-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/rds/db-name" \
-            --type "String" \
-            --value "$DB_NAME" \
-            --overwrite
-
-          echo "Database parameters stored in SSM."
   # --------------------------------------------------------
   # Run Database Initialization Lambda
   # --------------------------------------------------------
@@ -278,32 +219,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Create Customer Token If Missing
-        run: |
-          if aws ssm get-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/auth/customer-token" \
-            >/dev/null 2>&1; then
-            echo "Customer token already exists in SSM"
-          else
-            CUSTOMER_TOKEN=$(openssl rand -hex 32)
-
-            aws ssm put-parameter \
-              --name "/cloudmart/${ENVIRONMENT}/auth/customer-token" \
-              --type "SecureString" \
-              --value "$CUSTOMER_TOKEN"
-
-            echo "Customer token created and stored in SSM"
-          fi
-      - name: Verify Admin Token
-        run: |
-          aws ssm get-parameter \
-            --name "/cloudmart/${ENVIRONMENT}/auth/admin-token" \
-            --with-decryption \
-            --query "Parameter.Name" \
-            --output text
-
-          echo "Admin token exists in SSM"
-
+      
       - name: Validate Auth Template
         run: |
           aws cloudformation validate-template \

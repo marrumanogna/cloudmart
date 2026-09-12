@@ -94,7 +94,54 @@ Resources:
         - Key: Name
           Value: !Sub cloudmart-rds-${Environment}
 
+  # ============================================================
+  # RDS SSM PARAMETERS
+  # ============================================================
 
+  RdsHostParameter:
+    Type: AWS::SSM::Parameter
+    DeletionPolicy: Retain
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/host
+      Type: String
+      Value: !GetAtt CloudMartRDS.Endpoint.Address
+      Description: RDS database endpoint
+
+  RdsPortParameter:
+    Type: AWS::SSM::Parameter
+    DeletionPolicy: Retain
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/port
+      Type: String
+      Value: !GetAtt CloudMartRDS.Endpoint.Port
+      Description: RDS database port
+
+  RdsDbNameParameter:
+    Type: AWS::SSM::Parameter
+    DeletionPolicy: Retain
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/db-name
+      Type: String
+      Value: !Ref DBName
+      Description: RDS database name
+
+  RdsUsernameParameter:
+    Type: AWS::SSM::Parameter
+    DeletionPolicy: Retain
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/username
+      Type: String
+      Value: !Ref DBUsername
+      Description: RDS database username
+
+  RdsPasswordParameter:
+    Type: AWS::SSM::Parameter
+    DeletionPolicy: Retain
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/password
+      Type: SecureString
+      Value: !Ref DBPassword
+      Description: RDS database password
   # ============================================================
   # ARTIFACTS S3 BUCKET
   # ============================================================
@@ -188,18 +235,7 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/database/*
- 
-              # ------------------------------------------------
-              # SSM
-              # ------------------------------------------------
-
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/database/*
-
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
               # ------------------------------------------------
               # CLOUDWATCH LOGS
@@ -273,10 +309,10 @@ Resources:
             !Ref DBName
 
           DB_USER_PARAMETER:
-            !Sub /cloudmart/${Environment}/database/username
+            !Sub /cloudmart/${Environment}/rds/username
 
           DB_PASSWORD_PARAMETER:
-            !Sub /cloudmart/${Environment}/database/password
+            !Sub /cloudmart/${Environment}/rds/password
 
   DatabaseInitLambdaInvokePolicy:
   
