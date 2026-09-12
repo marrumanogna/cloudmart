@@ -73,8 +73,19 @@ Resources:
               - iam:DeleteRolePolicy
               - iam:AttachRolePolicy
               - iam:DetachRolePolicy
-              - iam:PassRole
             Resource: "*"
+          - Sid: PassRole
+            Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - arn:aws:iam::230623977534:role/cloudmart-customer-lambda-role-${Environment}
+              - arn:aws:iam::230623977534:role/cloudmart-product-lambda-role-${Environment}
+              - arn:aws:iam::230623977534:role/cloudmart-order-lambda-role-${Environment}
+              - arn:aws:iam::230623977534:role/cloudmart-order-processor-role-${Environment}
+              - arn:aws:iam::230623977534:role/cloudmart-report-lambda-role-${Environment}
+              - arn:aws:iam::230623977534:role/cloudmart-authorizer-role-${Environment}
+              - arn:aws:iam::230623977534:role/CloudMart-DatabaseInitLambda-${Environment}
 
           - Sid: IAMInstanceProfileManagement
             Effect: Allow
