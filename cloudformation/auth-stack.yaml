@@ -20,10 +20,8 @@ Parameters:
     Description: SSM parameter containing the admin API token
     Default: /cloudmart/dev/auth/admin-token
 
+
 Resources:
-
-
-  AuthorizerRole:
 
   AuthorizerRole:
     Type: AWS::IAM::Role
@@ -52,26 +50,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/customer-token
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/admin-token
-        - PolicyName: AuthorizerRdsSSMAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-        - PolicyName: AuthorizerLambdaVpcAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ec2:CreateNetworkInterface
-                  - ec2:DescribeNetworkInterfaces
-                  - ec2:DescribeSubnets
-                  - ec2:DeleteNetworkInterface
-                Resource: '*'
+
         - PolicyName: AuthorizerCloudWatchLogs
           PolicyDocument:
             Version: '2012-10-17'
@@ -82,7 +61,8 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-authorizer-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-authorizer-${Environment}:*
+
 
   AuthorizerFunction:
     Type: AWS::Lambda::Function
@@ -93,42 +73,23 @@ Resources:
       Role: !GetAtt AuthorizerRole.Arn
       Timeout: 10
       MemorySize: 128
-      VpcConfig:
-        SubnetIds:
-          - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnetId
-          - Fn::ImportValue: !Sub CloudMart-${Environment}-PrivateSubnet2Id
-        SecurityGroupIds:
-          - Fn::ImportValue: !Sub CloudMart-${Environment}-LambdaSecurityGroupId
 
       Environment:
         Variables:
           CUSTOMER_TOKEN_PARAMETER: !Ref CustomerTokenParameterName
           ADMIN_TOKEN_PARAMETER: !Ref AdminTokenParameterName
-          DB_HOST: !Sub /cloudmart/${Environment}/rds/host
-          DB_PORT: !Sub /cloudmart/${Environment}/rds/port
-          DB_NAME: !Sub /cloudmart/${Environment}/rds/db-name
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
 
       Code:
         ZipFile: |
           import boto3
           import os
-          import pymysql
 
           ssm = boto3.client("ssm")
 
           CUSTOMER_TOKEN_PARAMETER = os.environ["CUSTOMER_TOKEN_PARAMETER"]
           ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
 
-          DB_HOST = os.environ["DB_HOST"]
-          DB_PORT = os.environ["DB_PORT"]
-          DB_NAME = os.environ["DB_NAME"]
-          DB_USERNAME_PARAMETER = os.environ["DB_USERNAME_PARAMETER"]
-          DB_PASSWORD_PARAMETER = os.environ["DB_PASSWORD_PARAMETER"]
-
-
-          def get_parameter(parameter_name):
+          def get_token(parameter_name):
               response = ssm.get_parameter(
                   Name=parameter_name,
                   WithDecryption=True
@@ -136,7 +97,7 @@ Resources:
               return response["Parameter"]["Value"]
 
 
-          def generate_policy(principal_id, effect, resource, role=None, customer_id=None):
+          def generate_policy(principal_id, effect, resource, role=None):
               response = {
                   "principalId": principal_id,
                   "policyDocument": {
@@ -151,50 +112,16 @@ Resources:
                   }
               }
 
-              context = {}
-
               if role:
-                  context["role"] = role
-
-              if customer_id:
-                  context["customer_id"] = str(customer_id)
-
-              if context:
-                  response["context"] = context
+                  response["context"] = {
+                      "role": role
+                  }
 
               return response
 
 
-          def get_customer_by_token(token):
-              username = get_parameter(DB_USERNAME_PARAMETER)
-              password = get_parameter(DB_PASSWORD_PARAMETER)
-
-              connection = pymysql.connect(
-                  host=DB_HOST,
-                  port=int(DB_PORT),
-                  user=username,
-                  password=password,
-                  database=DB_NAME,
-                  connect_timeout=5,
-                  cursorclass=pymysql.cursors.DictCursor
-              )
-
-              try:
-                  with connection.cursor() as cursor:
-                      cursor.execute(
-                          """
-                          SELECT customer_id
-                          FROM customers
-                          WHERE customer_token = %s
-                          """,
-                          (token,)
-                      )
-                      return cursor.fetchone()
-              finally:
-                  connection.close()
-
-
           def lambda_handler(event, context):
+
               method_arn = event.get("methodArn", "*")
 
               arn_parts = method_arn.split("/")
@@ -217,43 +144,49 @@ Resources:
               if provided_token.lower().startswith("bearer "):
                   provided_token = provided_token[7:].strip()
 
-              if not provided_token:
-                  raise Exception("Unauthorized")
-
               try:
-                  admin_token = get_parameter(ADMIN_TOKEN_PARAMETER)
+                  customer_token = get_token(
+                      CUSTOMER_TOKEN_PARAMETER
+                  )
 
-                  if provided_token == admin_token:
-                      print("Admin authenticated")
-                      return generate_policy(
-                          "cloudmart-admin",
-                          "Allow",
-                          policy_resource,
-                          "ADMIN"
-                      )
-
-                  customer = get_customer_by_token(provided_token)
-
-                  if customer:
-                      print(f"Customer authenticated: {customer['customer_id']}")
-                      return generate_policy(
-                          f"cloudmart-customer-{customer['customer_id']}",
-                          "Allow",
-                          policy_resource,
-                          "CUSTOMER",
-                          customer["customer_id"]
-                      )
+                  admin_token = get_token(
+                      ADMIN_TOKEN_PARAMETER
+                  )
 
               except Exception as error:
-                  print(f"Authorization error: {error}")
+                  print(
+                      f"Failed to retrieve authentication tokens: {error}"
+                  )
+
                   return generate_policy(
                       "cloudmart-unauthorized",
                       "Deny",
                       method_arn
                   )
 
+              if provided_token == customer_token:
+                  print("Customer authenticated")
+
+                  return generate_policy(
+                      "cloudmart-customer",
+                      "Allow",
+                      policy_resource,
+                      "CUSTOMER"
+                  )
+
+              if provided_token == admin_token:
+                  print("Admin authenticated")
+
+                  return generate_policy(
+                      "cloudmart-admin",
+                      "Allow",
+                      policy_resource,
+                      "ADMIN"
+                  )
+
               print("Authorization failed")
               raise Exception("Unauthorized")
+
 
   AuthorizerLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -261,6 +194,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref AuthorizerFunction
       Principal: apigateway.amazonaws.com
+
 
 Outputs:
 
@@ -270,17 +204,20 @@ Outputs:
     Export:
       Name: !Sub CloudMart-${Environment}-AuthorizerFunctionArn
 
+
   AuthorizerFunctionInvokeArn:
     Description: API Gateway Lambda Authorizer invocation URI
     Value: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
     Export:
       Name: !Sub CloudMart-${Environment}-AuthorizerFunctionInvokeArn
 
+
   CustomerTokenParameterName:
     Description: SSM parameter containing the CloudMart customer token
     Value: !Ref CustomerTokenParameterName
     Export:
       Name: !Sub CloudMart-${Environment}-CustomerTokenParameterName
+
 
   AdminTokenParameterName:
     Description: SSM parameter containing the CloudMart admin token
