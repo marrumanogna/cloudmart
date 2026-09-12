@@ -206,27 +206,25 @@ def lambda_handler(event, context):
         # =====================================================
         # PATCH /orders/{order_id}
         # =====================================================
-        elif method == "PATCH":
+        elif method == "GET":
 
             path_parameters = event.get("pathParameters") or {}
+
             path_parameter_id = (
                 path_parameters.get("order_id")
                 or path_parameters.get("id")
             )
 
-            if not path_parameter_id:
-                return response(
-                    400,
-                    "Order ID is required"
-                )
+            if path_parameter_id:
+                try:
+                   order_id = int(path_parameter_id)
+                except (ValueError, TypeError):
+                    return response(
+                400,
+                "Invalid order ID"
+            )
 
-            try:
-                order_id = int(path_parameter_id)
-            except (ValueError, TypeError):
-                return response(
-                    400,
-                    "Invalid order ID"
-                )
+        # existing SELECT for one order goes here
 
             body = json.loads(event.get("body") or "{}")
             new_status = body.get("status")
