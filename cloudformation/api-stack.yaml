@@ -70,7 +70,8 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: '*'
+                Resource:
+                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-customer-${Environment}:*
 
         - PolicyName: CustomerLambdaVpcAccess
           PolicyDocument:
@@ -141,7 +142,8 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                   - cloudwatch:PutMetricData
-                Resource: '*'
+                Resource:
+                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-product-${Environment}:*
 
         - PolicyName: ProductLambdaVpcAccess
           PolicyDocument:
@@ -217,7 +219,8 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                   - cloudwatch:PutMetricData
-                Resource: '*'
+                Resource:
+                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-order-${Environment}:*
 
         - PolicyName: OrderLambdaVpcAccess
           PolicyDocument:
@@ -273,7 +276,8 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                   - cloudwatch:PutMetricData
-                Resource: '*'
+                Resource:
+                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-order-processor-${Environment}:*
 
         - PolicyName: OrderProcessorVpcAccess
           PolicyDocument:
@@ -351,7 +355,6 @@ Resources:
                     - arn:${AWS::Partition}:s3:::${Bucket}/*
                     - Bucket:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
-
         - PolicyName: ReportLambdaCloudWatch
           PolicyDocument:
             Version: '2012-10-17'
@@ -361,9 +364,13 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+                Resource:
+                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-report-${Environment}:*
+
+              - Effect: Allow
+                Action:
                   - cloudwatch:PutMetricData
                 Resource: '*'
-
         - PolicyName: ReportLambdaVpcAccess
           PolicyDocument:
             Version: '2012-10-17'

@@ -62,7 +62,8 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: '*'
+                Resource:
+                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-authorizer-${Environment}:*
 
   AuthorizerFunction:
     Type: AWS::Lambda::Function
