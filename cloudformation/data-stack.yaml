@@ -125,23 +125,7 @@ Resources:
       Value: !Ref DBName
       Description: RDS database name
 
-  RdsUsernameParameter:
-    Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/username
-      Type: String
-      Value: !Ref DBUsername
-      Description: RDS database username
-
-  RdsPasswordParameter:
-    Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/password
-      Type: SecureString
-      Value: !Ref DBPassword
-      Description: RDS database password
+  
   # ============================================================
   # ARTIFACTS S3 BUCKET
   # ============================================================
@@ -235,8 +219,9 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-
+                    - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+               
+              
               # ------------------------------------------------
               # CLOUDWATCH LOGS
               # ------------------------------------------------
