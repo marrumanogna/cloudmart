@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 import boto3
 import pymysql
 
@@ -52,12 +53,14 @@ def lambda_handler(event, context):
         try:
             with connection.cursor() as cursor:
 
+                customer_token = str(uuid.uuid4())
+
                 cursor.execute(
                     """
-                    INSERT INTO customers (name, email)
-                    VALUES (%s, %s)
+                    INSERT INTO customers (name, email, customer_token)
+                    VALUES (%s, %s, %s)
                     """,
-                    (name, email)
+                    (name, email, customer_token)
                 )
 
                 customer_id = cursor.lastrowid
@@ -74,7 +77,8 @@ def lambda_handler(event, context):
                 "message": "Customer created successfully",
                 "customer_id": customer_id,
                 "name": name,
-                "email": email
+                "email": email,
+                "customer_token": customer_token
             })
         }
 
