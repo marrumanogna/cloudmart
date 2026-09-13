@@ -324,6 +324,20 @@ def lambda_handler(event, context):
         # =====================================================
         elif method == "GET":
 
+            authorizer = (
+                event.get("requestContext", {})
+                .get("authorizer", {})
+            )
+
+            customer_id_from_token = authorizer.get("customer_id")
+            role = authorizer.get("role")
+
+            if role == "CUSTOMER" and not customer_id_from_token:
+                return response(
+                    403,
+                    "Customer identity not found"
+                )
+
             path_parameter_id = (
                 event.get("pathParameters") or {}
             ).get("order_id")
@@ -340,23 +354,42 @@ def lambda_handler(event, context):
 
                     try:
                         order_id = int(path_parameter_id)
+
                     except ValueError:
                         return response(
                             400,
                             "Invalid order ID"
                         )
 
-                    cursor.execute("""
-                        SELECT
+                    if role == "CUSTOMER":
+                        cursor.execute("""
+                            SELECT
+                                order_id,
+                                customer_id,
+                                status,
+                                total_amount,
+                                created_at,
+                                updated_at
+                            FROM orders
+                            WHERE order_id = %s
+                              AND customer_id = %s
+                        """, (
                             order_id,
-                            customer_id,
-                            status,
-                            total_amount,
-                            created_at,
-                            updated_at
-                        FROM orders
-                        WHERE order_id = %s
-                    """, (order_id,))
+                            customer_id_from_token
+                        ))
+
+                    else:
+                        cursor.execute("""
+                            SELECT
+                                order_id,
+                                customer_id,
+                                status,
+                                total_amount,
+                                created_at,
+                                updated_at
+                            FROM orders
+                            WHERE order_id = %s
+                        """, (order_id,))
 
                     order = cursor.fetchone()
 
@@ -396,23 +429,7 @@ def lambda_handler(event, context):
                 # =================================================
                 else:
 
-                    query_parameters = (
-                        event.get("queryStringParameters") or {}
-                    )
-
-                    customer_id = query_parameters.get(
-                        "customerId"
-                    )
-
-                    if customer_id:
-
-                        try:
-                            customer_id = int(customer_id)
-                        except ValueError:
-                            return response(
-                                400,
-                                "Invalid customerId"
-                            )
+                    if role == "CUSTOMER":
 
                         cursor.execute("""
                             SELECT
@@ -425,21 +442,55 @@ def lambda_handler(event, context):
                             FROM orders
                             WHERE customer_id = %s
                             ORDER BY created_at DESC
-                        """, (customer_id,))
+                        """, (customer_id_from_token,))
 
                     else:
 
-                        cursor.execute("""
-                            SELECT
-                                order_id,
-                                customer_id,
-                                status,
-                                total_amount,
-                                created_at,
-                                updated_at
-                            FROM orders
-                            ORDER BY created_at DESC
-                        """)
+                        query_parameters = (
+                            event.get("queryStringParameters") or {}
+                        )
+
+                        customer_id = query_parameters.get(
+                            "customerId"
+                        )
+
+                        if customer_id:
+
+                            try:
+                                customer_id = int(customer_id)
+
+                            except ValueError:
+                                return response(
+                                    400,
+                                    "Invalid customerId"
+                                )
+
+                            cursor.execute("""
+                                SELECT
+                                    order_id,
+                                    customer_id,
+                                    status,
+                                    total_amount,
+                                    created_at,
+                                    updated_at
+                                FROM orders
+                                WHERE customer_id = %s
+                                ORDER BY created_at DESC
+                            """, (customer_id,))
+
+                        else:
+
+                            cursor.execute("""
+                                SELECT
+                                    order_id,
+                                    customer_id,
+                                    status,
+                                    total_amount,
+                                    created_at,
+                                    updated_at
+                                FROM orders
+                                ORDER BY created_at DESC
+                            """)
 
                     orders = cursor.fetchall()
 
