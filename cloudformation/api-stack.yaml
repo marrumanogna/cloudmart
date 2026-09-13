@@ -277,7 +277,7 @@ Resources:
                   - logs:PutLogEvents
                   - cloudwatch:PutMetricData
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-order-processor-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-order-processor-${Environment}:*
 
         - PolicyName: OrderProcessorVpcAccess
           PolicyDocument:
