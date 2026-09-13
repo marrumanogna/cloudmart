@@ -1,13 +1,19 @@
 import boto3
 import os
+import pymysql
 
 ssm = boto3.client("ssm")
 
-CUSTOMER_TOKEN_PARAMETER = os.environ["CUSTOMER_TOKEN_PARAMETER"]
 ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
 
+DB_HOST = os.environ["DB_HOST"]
+DB_PORT = int(os.environ["DB_PORT"])
+DB_NAME = os.environ["DB_NAME"]
+DB_USERNAME_PARAMETER = os.environ["DB_USERNAME_PARAMETER"]
+DB_PASSWORD_PARAMETER = os.environ["DB_PASSWORD_PARAMETER"]
 
-def get_token(parameter_name):
+
+def get_parameter(parameter_name):
     response = ssm.get_parameter(
         Name=parameter_name,
         WithDecryption=True
@@ -15,7 +21,39 @@ def get_token(parameter_name):
     return response["Parameter"]["Value"]
 
 
-def generate_policy(principal_id, effect, resource, role=None):
+def get_customer_by_token(customer_token):
+    username = get_parameter(DB_USERNAME_PARAMETER)
+    password = get_parameter(DB_PASSWORD_PARAMETER)
+
+    connection = pymysql.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        user=username,
+        password=password,
+        database=DB_NAME,
+        cursorclass=pymysql.cursors.DictCursor,
+        connect_timeout=5
+    )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT customer_id
+                FROM customers
+                WHERE customer_token = %s
+                LIMIT 1
+                """,
+                (customer_token,)
+            )
+
+            return cursor.fetchone()
+
+    finally:
+        connection.close()
+
+
+def generate_policy(principal_id, effect, resource, role=None, customer_id=None):
     response = {
         "principalId": principal_id,
         "policyDocument": {
@@ -30,10 +68,16 @@ def generate_policy(principal_id, effect, resource, role=None):
         }
     }
 
+    context = {}
+
     if role:
-        response["context"] = {
-            "role": role
-        }
+        context["role"] = role
+
+    if customer_id is not None:
+        context["customer_id"] = str(customer_id)
+
+    if context:
+        response["context"] = context
 
     return response
 
@@ -63,36 +107,42 @@ def lambda_handler(event, context):
         provided_token = provided_token[7:].strip()
 
     try:
-        customer_token = get_token(CUSTOMER_TOKEN_PARAMETER)
-        admin_token = get_token(ADMIN_TOKEN_PARAMETER)
+        admin_token = get_parameter(ADMIN_TOKEN_PARAMETER)
+
+        if provided_token == admin_token:
+            print("Admin authenticated")
+
+            return generate_policy(
+                "cloudmart-admin",
+                "Allow",
+                policy_resource,
+                "ADMIN"
+            )
+
+        customer = get_customer_by_token(provided_token)
+
+        if customer:
+            customer_id = customer["customer_id"]
+
+            print(
+                f"Customer authenticated: customer_id={customer_id}"
+            )
+
+            return generate_policy(
+                f"cloudmart-customer-{customer_id}",
+                "Allow",
+                policy_resource,
+                "CUSTOMER",
+                customer_id
+            )
 
     except Exception as error:
-        print(f"Failed to retrieve authentication tokens: {error}")
+        print(f"Authorization lookup failed: {error}")
 
         return generate_policy(
             "cloudmart-unauthorized",
             "Deny",
             method_arn
-        )
-
-    if provided_token == customer_token:
-        print("Customer authenticated")
-
-        return generate_policy(
-            "cloudmart-customer",
-            "Allow",
-            policy_resource,
-            "CUSTOMER"
-        )
-
-    if provided_token == admin_token:
-        print("Admin authenticated")
-
-        return generate_policy(
-            "cloudmart-admin",
-            "Allow",
-            policy_resource,
-            "ADMIN"
         )
 
     print("Authorization failed")

@@ -220,16 +220,31 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Get Artifacts Bucket
+        run: |
+          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
+            --output text)
 
+          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
+
+      - name: Package Auth Lambda
+        run: |
+          aws cloudformation package \
+            --template-file cloudformation/auth-stack.yaml \
+            --s3-bucket "$ARTIFACTS_BUCKET" \
+            --output-template-file cloudformation/auth-stack-packaged.yaml \
+            --region ${{ env.AWS_REGION }}
       - name: Validate Auth Template
         run: |
           aws cloudformation validate-template \
-            --template-body file://cloudformation/auth-stack.yaml
+            --template-body file://cloudformation/auth-stack-packaged.yaml
 
       - name: Deploy Auth Stack
         run: |
           aws cloudformation deploy \
-            --template-file cloudformation/auth-stack.yaml \
+            --template-file cloudformation/auth-stack-packaged.yaml \
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
