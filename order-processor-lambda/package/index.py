@@ -57,6 +57,12 @@ def response(status_code, message, data=None):
         "body": json.dumps(body, default=str)
     }
 
+def log_event(level, event, **details):
+    print(json.dumps({
+        "level": level,
+        "event": event,
+        **details
+    }, default=str))
 
 def publish_event(detail_type, detail):
     try:
@@ -82,7 +88,6 @@ def publish_event(detail_type, detail):
             "event_type": detail_type,
             "error": str(e)
         }))
-
 
 def send_failed_order_to_sqs(order_data):
     print("DEBUG: Sending failed order to SQS")
@@ -579,7 +584,14 @@ def lambda_handler(event, context):
             "customer_id": customer_id,
             "total_amount": total_amount
         }, default=str))
-
+        log_event(
+            "INFO",
+            "OrderConfirmed",
+            order_id=order_id,
+            customer_id=customer_id,
+            total_amount=total_amount,
+            status="CONFIRMED"
+        )
         return response(
             200,
             "Order confirmed successfully",
@@ -605,6 +617,13 @@ def lambda_handler(event, context):
             "items": event.get("items"),
             "reason": str(e)
         }
+        log_event(
+            "ERROR",
+            "OrderFailed",
+            order_id=order_id,
+            customer_id=event.get("customer_id"),
+            reason=str(e)
+        )
 
         print(json.dumps({
             "level": "ERROR",
