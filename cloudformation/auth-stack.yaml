@@ -14,13 +14,10 @@ Parameters:
   CustomerTokenParameterName:
     Type: String
     Description: SSM parameter containing the customer API token
-    Default: /cloudmart/dev/auth/customer-token
 
   AdminTokenParameterName:
     Type: String
     Description: SSM parameter containing the admin API token
-    Default: /cloudmart/dev/auth/admin-token
-
 
 Resources:
 
