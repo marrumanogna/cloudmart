@@ -30,29 +30,29 @@ def response(status_code, message, data=None):
 def get_db_connection():
 
     environment = os.environ["ENVIRONMENT"]
-    
+
     host = ssm_client.get_parameter(
         Name=f"/cloudmart/{environment}/rds/host",
         WithDecryption=True
     )["Parameter"]["Value"]
 
     port = ssm_client.get_parameter(
-        Name=f"/cloudmart/{environment}/rds/port"
+        Name=f"/cloudmart/{environment}/rds/port",
         WithDecryption=True
     )["Parameter"]["Value"]
 
     username = ssm_client.get_parameter(
-        Name=f"/cloudmart/{environment}/rds/username"
+        Name=f"/cloudmart/{environment}/rds/username",
         WithDecryption=True
     )["Parameter"]["Value"]
 
     password = ssm_client.get_parameter(
-        Name=f"/cloudmart/{environment}/rds/password"
+        Name=f"/cloudmart/{environment}/rds/password",
         WithDecryption=True
     )["Parameter"]["Value"]
 
     database = ssm_client.get_parameter(
-        Name=f"/cloudmart/{environment}/rds/db-name"
+        Name=f"/cloudmart/{environment}/rds/db-name",
         WithDecryption=True
     )["Parameter"]["Value"]
 
