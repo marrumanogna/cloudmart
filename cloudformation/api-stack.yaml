@@ -1152,7 +1152,7 @@ Resources:
   # API DEPLOYMENT
   # ============================================================
 
-  CloudMartApiDeployment:
+  CloudMartApiDeploymentV3:
      Type: AWS::ApiGateway::Deployment
 
      DependsOn:
@@ -1176,7 +1176,7 @@ Resources:
     Type: AWS::ApiGateway::Stage
     Properties:
       RestApiId: !Ref CloudMartApi
-      DeploymentId: !Ref CloudMartApiDeployment
+      DeploymentId: !Ref CloudMartApiDeploymentV3
       StageName: !Ref Environment
       Description: !Sub CloudMart ${Environment} API stage
 
