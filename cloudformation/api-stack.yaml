@@ -1102,9 +1102,7 @@ Resources:
       RestApiId: !Ref CloudMartApi
       ResourceId: !Ref CustomersResource
       HttpMethod: POST
-
-      AuthorizationType: CUSTOM
-      AuthorizerId: !Ref CloudMartAuthorizer
+      AuthorizationType: NONE
 
       Integration:
         Type: AWS_PROXY
