@@ -94,37 +94,6 @@ Resources:
         - Key: Name
           Value: !Sub cloudmart-rds-${Environment}
 
-  # ============================================================
-  # RDS SSM PARAMETERS
-  # ============================================================
-
-  RdsHostParameter:
-    Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/host
-      Type: String
-      Value: !GetAtt CloudMartRDS.Endpoint.Address
-      Description: RDS database endpoint
-
-  RdsPortParameter:
-    Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/port
-      Type: String
-      Value: !GetAtt CloudMartRDS.Endpoint.Port
-      Description: RDS database port
-
-  RdsDbNameParameter:
-    Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/db-name
-      Type: String
-      Value: !Ref DBName
-      Description: RDS database name
-
   
   # ============================================================
   # ARTIFACTS S3 BUCKET
