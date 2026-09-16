@@ -403,6 +403,13 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-low-stock-${Environment}
 
+  LowStockSubscription:
+  Type: AWS::SNS::Subscription
+  Condition: CreateLowStockSubscription
+  Properties:
+    Protocol: email
+    Endpoint: !Ref LowStockEmail
+    TopicArn: !Ref LowStockTopic
 
   # ============================================================
   # M4 ORDER CONFIRMATION SNS
@@ -412,6 +419,24 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub cloudmart-order-confirmed-${Environment}
+  
+# ============================================================
+# M4 ORDER CONFIRMATION SNS
+# ============================================================
+
+OrderConfirmedTopic:
+  Type: AWS::SNS::Topic
+  Properties:
+    TopicName: !Sub cloudmart-order-confirmed-${Environment}
+
+OrderConfirmedEmailSubscription:
+  Type: AWS::SNS::Subscription
+  Condition: CreateLowStockSubscription
+  DeletionPolicy: Delete
+  Properties:
+    Protocol: email
+    Endpoint: !Ref LowStockEmail
+    TopicArn: !Ref OrderConfirmedTopic
 
 
   # M3 INVENTORY CHANGE EVENTBRIDGE RULE
@@ -471,6 +496,15 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub cloudmart-order-placed-${Environment}
+
+  OrderPlacedEmailSubscription:
+  Type: AWS::SNS::Subscription
+  Condition: CreateLowStockSubscription
+  DeletionPolicy: Delete
+  Properties:
+    Protocol: email
+    Endpoint: !Ref LowStockEmail
+    TopicArn: !Ref OrderPlacedTopic
 
 
   OrderPlacedRule:
@@ -574,6 +608,15 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-order-failed-${Environment}
 
+  OrderFailedEmailSubscription:
+  Type: AWS::SNS::Subscription
+  Condition: CreateLowStockSubscription
+  DeletionPolicy: Delete
+  Properties:
+    Protocol: email
+    Endpoint: !Ref LowStockEmail
+    TopicArn: !Ref OrderFailedTopic
+
 
   OrderFailedRule:
     Type: AWS::Events::Rule
@@ -619,7 +662,7 @@ Resources:
               ArnEquals:
                 aws:SourceArn: !GetAtt OrderFailedRule.Arn
 
-   # ============================================================
+  # ============================================================
   # CUSTOMER LAMBDA
   # ============================================================
 
