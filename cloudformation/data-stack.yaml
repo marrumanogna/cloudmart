@@ -18,15 +18,30 @@ Parameters:
 
   DBUsername:
     Type: String
+    NoEcho: true
     Default: cloudmartadmin
 
   DBPassword:
     Type: String
     NoEcho: true
-    MinLength: 8
+    Default: TEMP
 
 
 Resources:
+
+  RdsUsernameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/username
+      Type: String
+      Value: !Ref DBUsername
+
+  RdsPasswordParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/rds/password
+      Type: String
+      Value: !Ref DBPassword
 
   # ============================================================
   # RDS SUBNET GROUP
@@ -62,9 +77,7 @@ Resources:
 
       DBName: !Ref DBName
 
-      MasterUsername: !Ref DBUsername
-
-      MasterUserPassword: !Ref DBPassword
+      MasterUsername: cloudmartadmin
 
       DBInstanceClass: db.t3.micro
 

@@ -11,15 +11,19 @@ Parameters:
       - dev
       - prod
 
-  CustomerTokenParameterName:
+  AdminToken:
     Type: String
-    Description: SSM parameter containing the customer API token
-
-  AdminTokenParameterName:
-    Type: String
-    Description: SSM parameter containing the admin API token
+    NoEcho: true
+    Default: TEMP
 
 Resources:
+
+  AdminTokenParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/auth/admin-token
+      Type: String
+      Value: !Ref AdminToken
 
   AuthorizerRole:
     Type: AWS::IAM::Role
@@ -46,7 +50,6 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/customer-token
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/admin-token
 
         - PolicyName: AuthorizerRdsSSMAccess
@@ -105,8 +108,7 @@ Resources:
 
       Environment:
         Variables:
-          CUSTOMER_TOKEN_PARAMETER: !Ref CustomerTokenParameterName
-          ADMIN_TOKEN_PARAMETER: !Ref AdminTokenParameterName
+          ADMIN_TOKEN_PARAMETER: !Ref AdminTokenParameter
 
           DB_HOST:
             Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
@@ -145,17 +147,3 @@ Outputs:
     Value: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
     Export:
       Name: !Sub CloudMart-${Environment}-AuthorizerFunctionInvokeArn
-
-
-  CustomerTokenParameterName:
-    Description: SSM parameter containing the CloudMart customer token
-    Value: !Ref CustomerTokenParameterName
-    Export:
-      Name: !Sub CloudMart-${Environment}-CustomerTokenParameterName
-
-
-  AdminTokenParameterName:
-    Description: SSM parameter containing the CloudMart admin token
-    Value: !Ref AdminTokenParameterName
-    Export:
-      Name: !Sub CloudMart-${Environment}-AdminTokenParameterName

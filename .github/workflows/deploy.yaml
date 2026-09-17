@@ -128,8 +128,6 @@ jobs:
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
-              DBUsername="${{ secrets.DB_USERNAME }}" \
-              DBPassword="${{ secrets.DB_PASSWORD }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
 
@@ -181,8 +179,6 @@ jobs:
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
-              DBUsername="${{ secrets.DB_USERNAME }}" \
-              DBPassword="${{ secrets.DB_PASSWORD }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
 
@@ -248,8 +244,6 @@ jobs:
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
-              CustomerTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/customer-token" \
-              AdminTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/admin-token" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
 
