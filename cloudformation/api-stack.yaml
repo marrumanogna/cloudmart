@@ -890,14 +890,6 @@ Resources:
           - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerArn}/invocations
           - AuthorizerArn:
               Fn::ImportValue: !Sub CloudMart-${Environment}-AuthorizerFunctionArn
-    AccessDeniedResponse:
-      Type: AWS::ApiGateway::GatewayResponse
-      Properties:
-        RestApiId: !Ref CloudMartApi
-        ResponseType: ACCESS_DENIED
-        StatusCode: '403'
-        ResponseTemplates:
-          application/json: '{"message":"Customers are not allowed to create orders"}'
 
 
   # ============================================================
