@@ -440,8 +440,7 @@ Resources:
               product_id: "$.detail.product_id"
               product_name: "$.detail.product_name"
               stock_quantity: "$.detail.stock_quantity"
-            InputTemplate: '"LOW STOCK ALERT - CLOUDMART\n\nHello,\n\nA product in your CloudMart inventory is running low.\n\nProduct Details\n------------------------------\nProduct ID: <product_id>\nProduct Name: <product_name>\nRemaining Stock: <stock_quantity>\n\nPlease review the inventory and restock the product when required.\n\nRegards,\nCloudMart Team"'
-
+            InputTemplate: '"LOW STOCK ALERT - CLOUDMART | Product ID: <product_id> | Product: <product_name> | Remaining Stock: <stock_quantity> | Please restock this product."'
   LowStockTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
@@ -500,8 +499,7 @@ Resources:
             InputPathsMap:
               order_id: "$.detail.order_id"
               customer_id: "$.detail.customer_id"
-            InputTemplate: '"ORDER PLACED - CLOUDMART\n\nHello,\n\nYour CloudMart order has been successfully placed.\n\nOrder Details\n------------------------------\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nStatus: PLACED\n\nYour order is now being processed.\nYou will receive another notification once the order is confirmed.\n\nThank you for shopping with CloudMart!\n\nRegards,\nCloudMart Team"'
-
+            InputTemplate: '"ORDER PLACED - CLOUDMART | Order ID: <order_id> | Customer ID: <customer_id> | Status: PLACED | Your order is being processed."'
   OrderPlacedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
@@ -545,7 +543,7 @@ Resources:
               customer_id: "$.detail.customer_id"
               total_amount: "$.detail.total_amount"
               status: "$.detail.status"
-            InputTemplate: '"ORDER CONFIRMED - CLOUDMART\n\nHello,\n\nYour CloudMart order has been successfully confirmed.\n\nOrder Details\n------------------------------\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nTotal Amount: ₹<total_amount>\nStatus: <status>\n\nYour order has been confirmed and is being processed.\n\nThank you for shopping with CloudMart!\n\nRegards,\nCloudMart Team"'
+            InputTemplate: '"ORDER CONFIRMED - CLOUDMART | Order ID: <order_id> | Customer ID: <customer_id> | Total Amount: ₹<total_amount> | Status: <status> | Your order has been confirmed."'
 
   OrderConfirmedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
@@ -605,7 +603,7 @@ Resources:
               order_id: "$.detail.order_id"
               customer_id: "$.detail.customer_id"
               reason: "$.detail.reason"
-            InputTemplate: '"ORDER FAILED - CLOUDMART\n\nHello,\n\nUnfortunately, we were unable to process your CloudMart order.\n\nOrder Details\n------------------------------\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nReason: <reason>\n\nYour order could not be completed.\nPlease try again or choose another product.\n\nIf you need assistance, please contact the CloudMart support team.\n\nRegards,\nCloudMart Team"'
+            InputTemplate: '"ORDER FAILED - CLOUDMART | Order ID: <order_id> | Customer ID: <customer_id> | Reason: <reason> | Please try again or choose another product."'
 
   OrderFailedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
