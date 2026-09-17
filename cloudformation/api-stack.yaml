@@ -836,8 +836,7 @@ Resources:
           REPORTS_BUCKET:
             Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
 
-      Code:
-        ZipFile: |
+      InlineCode: |
           import json
           import os
 
