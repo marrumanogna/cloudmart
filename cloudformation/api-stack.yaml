@@ -410,15 +410,6 @@ Resources:
     Protocol: email
     Endpoint: !Ref LowStockEmail
     TopicArn: !Ref LowStockTopic
-
-  # ============================================================
-  # M4 ORDER CONFIRMATION SNS
-  # ============================================================
-
-  OrderConfirmedTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub cloudmart-order-confirmed-${Environment}
   
 # ============================================================
 # M4 ORDER CONFIRMATION SNS
@@ -1106,9 +1097,6 @@ OrderConfirmedEmailSubscription:
           Fn::Sub:
             - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
             - FunctionArn: !GetAtt OrderLambda.Arn
-
-  OrdersPostMethod:
-    Type: AWS::ApiGateway::Method
   OrdersPostMethod:
     Type: AWS::ApiGateway::Method
     Properties:
