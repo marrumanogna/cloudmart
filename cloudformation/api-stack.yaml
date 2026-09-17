@@ -12,18 +12,15 @@ Parameters:
       - dev
       - prod
 
-  LowStockEmail:
-    Type: String
-    Default: ""
-    Description: Email address for low-stock SNS alerts. Leave empty to skip subscription.
-
 Conditions:
 
-  CreateLowStockSubscription: !Not
-    - !Equals
-      - !Ref LowStockEmail
-      - ""
 Resources:
+  NotificationEmailParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/notifications/email
+      Type: String
+      Value: "TEMP"
 
   FailedOrdersQueue:
     Type: AWS::SQS::Queue
@@ -407,7 +404,7 @@ Resources:
     Condition: CreateLowStockSubscription
     Properties:
       Protocol: email
-      Endpoint: !Ref LowStockEmail
+      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
       TopicArn: !Ref LowStockTopic
   
 # ============================================================
@@ -425,7 +422,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Ref LowStockEmail
+      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
       TopicArn: !Ref OrderConfirmedTopic
 
   #============================================================
@@ -454,9 +451,24 @@ Resources:
               product_name: "$.detail.product_name"
               stock_quantity: "$.detail.stock_quantity"
 
-            InputTemplate: '"CloudMart Low Stock Alert!\n\nProduct ID: <product_id>\nProduct: <product_name>\nRemaining Stock: <stock_quantity>\n\nPlease restock this product."'
+            InputTemplate: |
+              "LOW STOCK ALERT - CLOUDMART
 
+              Hello,
 
+              A product in your CloudMart inventory is running low.
+
+              Product Details
+              ------------------------------
+              Product ID       : <product_id>
+              Product Name     : <product_name>
+              Remaining Stock  : <stock_quantity>
+
+              Please review the inventory and restock the product when required.
+
+              Regards,
+              CloudMart Team"
+              
   LowStockTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
@@ -493,7 +505,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Ref LowStockEmail
+      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
       TopicArn: !Ref OrderPlacedTopic
 
   OrderPlacedRule:
@@ -517,8 +529,26 @@ Resources:
               order_id: "$.detail.order_id"
               customer_id: "$.detail.customer_id"
 
-            InputTemplate: '"Order Placed!\n\nHello,\n\nYour CloudMart order has been successfully placed.\n\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nStatus: PLACED\n\nWe are processing your order and will keep you updated.\n\nThank you for shopping with CloudMart!"'
+            InputTemplate: |
+              "ORDER PLACED - CLOUDMART
 
+              Hello,
+
+              Your CloudMart order has been successfully placed.
+
+              Order Details
+              ------------------------------
+              Order ID     : <order_id>
+              Customer ID  : <customer_id>
+              Status       : PLACED
+
+              Your order is now being processed.
+              You will receive another notification once the order is confirmed.
+
+              Thank you for shopping with CloudMart!
+
+              Regards,
+              CloudMart Team"
 
   OrderPlacedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
@@ -564,8 +594,26 @@ Resources:
               total_amount: "$.detail.total_amount"
               status: "$.detail.status"
 
-            InputTemplate: '"Order Confirmed!\n\nHello,\n\nYour CloudMart order has been successfully confirmed.\n\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nTotal Amount: ₹<total_amount>\nStatus: <status>\n\nThank you for shopping with CloudMart!"'
+            InputTemplate: |
+              "ORDER CONFIRMED - CLOUDMART
 
+              Hello,
+
+              Your CloudMart order has been successfully confirmed.
+
+              Order Details
+              ------------------------------
+              Order ID     : <order_id>
+              Customer ID  : <customer_id>
+              Total Amount : ₹<total_amount>
+              Status       : <status>
+
+              Your order has been confirmed and is being processed.
+
+              Thank you for shopping with CloudMart!
+
+              Regards,
+              CloudMart Team"
 
   OrderConfirmedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
@@ -603,7 +651,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Ref LowStockEmail
+      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
       TopicArn: !Ref OrderFailedTopic
 
   OrderFailedRule:
@@ -627,7 +675,26 @@ Resources:
               customer_id: "$.detail.customer_id"
               reason: "$.detail.reason"
 
-            InputTemplate: '"Order Failed!\n\nHello,\n\nUnfortunately, we were unable to process your CloudMart order.\n\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nReason: <reason>\n\nPlease try again or choose another product.\n\nThank you,\nCloudMart Team"'
+            InputTemplate: |
+              "ORDER FAILED - CLOUDMART
+
+              Hello,
+
+              Unfortunately, we were unable to process your CloudMart order.
+
+              Order Details
+              ------------------------------
+              Order ID     : <order_id>
+              Customer ID  : <customer_id>
+              Reason       : <reason>
+
+              Your order could not be completed.
+              Please try again or choose another product.
+
+              If you need assistance, please contact the CloudMart support team.
+
+              Regards,
+              CloudMart Team"
 
   OrderFailedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
