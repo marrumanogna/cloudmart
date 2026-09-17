@@ -23,7 +23,6 @@ Conditions:
     - !Equals
       - !Ref LowStockEmail
       - ""
-
 Resources:
 
   FailedOrdersQueue:
@@ -415,21 +414,20 @@ Resources:
 # M4 ORDER CONFIRMATION SNS
 # ============================================================
 
-OrderConfirmedTopic:
-  Type: AWS::SNS::Topic
-  Properties:
-    TopicName: !Sub cloudmart-order-confirmed-${Environment}
+  OrderConfirmedTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub cloudmart-order-confirmed-${Environment}
+  OrderConfirmedEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: CreateLowStockSubscription
+    DeletionPolicy: Delete
+    Properties:
+      Protocol: email
+      Endpoint: !Ref LowStockEmail
+      TopicArn: !Ref OrderConfirmedTopic
 
-OrderConfirmedEmailSubscription:
-  Type: AWS::SNS::Subscription
-  Condition: CreateLowStockSubscription
-  DeletionPolicy: Delete
-  Properties:
-    Protocol: email
-    Endpoint: !Ref LowStockEmail
-    TopicArn: !Ref OrderConfirmedTopic
-
-
+  #============================================================
   # M3 INVENTORY CHANGE EVENTBRIDGE RULE
   # ============================================================
   
