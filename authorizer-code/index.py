@@ -128,6 +128,27 @@ def lambda_handler(event, context):
                 f"Customer authenticated: customer_id={customer_id}"
             )
 
+            # Customers cannot create, update, or delete products
+            request_method = event.get("httpMethod", "")
+            request_path = event.get("path", "")
+
+            if (
+                (request_path.rstrip("/") == "/products"
+                 and request_method == "POST")
+                or
+                (request_path.startswith("/products/")
+                 and request_method in ["PUT", "DELETE"])
+            ):
+                print("Customer is not authorized for product modification")
+
+                return generate_policy(
+                    f"cloudmart-customer-{customer_id}",
+                    "Deny",
+                    method_arn,
+                    "CUSTOMER",
+                    customer_id
+                )
+
             return generate_policy(
                 f"cloudmart-customer-{customer_id}",
                 "Allow",
