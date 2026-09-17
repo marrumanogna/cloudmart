@@ -12,8 +12,6 @@ Parameters:
       - dev
       - prod
 
-Conditions:
-
 Resources:
   NotificationEmailParameter:
     Type: AWS::SSM::Parameter
@@ -468,7 +466,7 @@ Resources:
 
               Regards,
               CloudMart Team"
-              
+
   LowStockTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
