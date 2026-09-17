@@ -158,6 +158,14 @@ def lambda_handler(event, context):
                     customer_id
                 )
 
+            return generate_policy(
+                f"cloudmart-customer-{customer_id}",
+                "Allow",
+                method_arn,
+                "CUSTOMER",
+                customer_id
+            )
+
     except Exception as error:
         print(f"Authorization lookup failed: {error}")
 
