@@ -399,7 +399,6 @@ Resources:
 
   LowStockSubscription:
     Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
     Properties:
       Protocol: email
       Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
@@ -416,7 +415,6 @@ Resources:
 
   OrderConfirmedEmailSubscription:
     Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
     DeletionPolicy: Delete
     Properties:
       Protocol: email
@@ -499,7 +497,6 @@ Resources:
 
   OrderPlacedEmailSubscription:
     Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
     DeletionPolicy: Delete
     Properties:
       Protocol: email
@@ -645,7 +642,6 @@ Resources:
 
   OrderFailedEmailSubscription:
     Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
     DeletionPolicy: Delete
     Properties:
       Protocol: email
