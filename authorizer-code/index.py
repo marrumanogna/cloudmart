@@ -85,6 +85,7 @@ def generate_policy(principal_id, effect, resource, role=None, customer_id=None)
 def lambda_handler(event, context):
 
     method_arn = event.get("methodArn", "*")
+    print(f"Method ARN: {method_arn}")
 
     arn_parts = method_arn.split("/")
 
