@@ -316,7 +316,7 @@ def lambda_handler(event, context):
 
             except Exception:
                 conn.rollback()
-                raises
+                raise
 
             finally:
                 cursor.close()
