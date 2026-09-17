@@ -26,6 +26,10 @@ Parameters:
     NoEcho: true
     Default: TEMP
 
+  NotificationEmail:
+    Type: String
+    Default: TEMP
+
 
 Resources:
 
@@ -42,6 +46,13 @@ Resources:
       Name: !Sub /cloudmart/${Environment}/rds/password
       Type: String
       Value: !Ref DBPassword
+
+  NotificationEmailParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /cloudmart/${Environment}/notifications/email
+      Type: String
+      Value: !Ref NotificationEmail
 
   # ============================================================
   # RDS SUBNET GROUP

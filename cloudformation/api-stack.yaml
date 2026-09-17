@@ -13,12 +13,6 @@ Parameters:
       - prod
 
 Resources:
-  NotificationEmailParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/notifications/email
-      Type: String
-      Value: "TEMP"
 
   FailedOrdersQueue:
     Type: AWS::SQS::Queue
