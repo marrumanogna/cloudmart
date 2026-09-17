@@ -129,9 +129,17 @@ def lambda_handler(event, context):
                 f"Customer authenticated: customer_id={customer_id}"
             )
 
+            # Get the HTTP method and path from the API Gateway method ARN
+            if len(arn_parts) >= 4:
+                request_method = arn_parts[2]
+                request_path = "/" + "/".join(arn_parts[3:])
+            else:
+                request_method = ""
+                request_path = ""
+
             # Customers cannot create, update, or delete products
-            request_method = event.get("httpMethod", "")
-            request_path = event.get("path", "")
+            request_method = event.get("httpMethod", request_method)
+            request_path = event.get("path", request_path)
 
             if (
                 (request_path.rstrip("/") == "/products"
@@ -150,10 +158,25 @@ def lambda_handler(event, context):
                     customer_id
                 )
 
+            # Customers cannot create orders
+            if (
+                request_path.rstrip("/") == "/orders"
+                and request_method == "POST"
+            ):
+                print("Customer is not authorized to POST /orders")
+
+                return generate_policy(
+                    f"cloudmart-customer-{customer_id}",
+                    "Deny",
+                    method_arn,
+                    "CUSTOMER",
+                    customer_id
+                )
+
             return generate_policy(
                 f"cloudmart-customer-{customer_id}",
                 "Allow",
-                policy_resource,
+                method_arn,
                 "CUSTOMER",
                 customer_id
             )
