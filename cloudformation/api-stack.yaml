@@ -404,12 +404,12 @@ Resources:
       TopicName: !Sub cloudmart-low-stock-${Environment}
 
   LowStockSubscription:
-  Type: AWS::SNS::Subscription
-  Condition: CreateLowStockSubscription
-  Properties:
-    Protocol: email
-    Endpoint: !Ref LowStockEmail
-    TopicArn: !Ref LowStockTopic
+    Type: AWS::SNS::Subscription
+    Condition: CreateLowStockSubscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref LowStockEmail
+      TopicArn: !Ref LowStockTopic
   
 # ============================================================
 # M4 ORDER CONFIRMATION SNS
@@ -489,14 +489,13 @@ OrderConfirmedEmailSubscription:
       TopicName: !Sub cloudmart-order-placed-${Environment}
 
   OrderPlacedEmailSubscription:
-  Type: AWS::SNS::Subscription
-  Condition: CreateLowStockSubscription
-  DeletionPolicy: Delete
-  Properties:
-    Protocol: email
-    Endpoint: !Ref LowStockEmail
-    TopicArn: !Ref OrderPlacedTopic
-
+    Type: AWS::SNS::Subscription
+    Condition: CreateLowStockSubscription
+    DeletionPolicy: Delete
+    Properties:
+      Protocol: email
+      Endpoint: !Ref LowStockEmail
+      TopicArn: !Ref OrderPlacedTopic
 
   OrderPlacedRule:
     Type: AWS::Events::Rule
@@ -600,14 +599,13 @@ OrderConfirmedEmailSubscription:
       TopicName: !Sub cloudmart-order-failed-${Environment}
 
   OrderFailedEmailSubscription:
-  Type: AWS::SNS::Subscription
-  Condition: CreateLowStockSubscription
-  DeletionPolicy: Delete
-  Properties:
-    Protocol: email
-    Endpoint: !Ref LowStockEmail
-    TopicArn: !Ref OrderFailedTopic
-
+    Type: AWS::SNS::Subscription
+    Condition: CreateLowStockSubscription
+    DeletionPolicy: Delete
+    Properties:
+      Protocol: email
+      Endpoint: !Ref LowStockEmail
+      TopicArn: !Ref OrderFailedTopic
 
   OrderFailedRule:
     Type: AWS::Events::Rule
@@ -816,7 +814,7 @@ OrderConfirmedEmailSubscription:
   # ============================================================
 
   ReportLambda:
-    Type: AWS::Lambda::Function
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub cloudmart-report-${Environment}
       Runtime: python3.11
