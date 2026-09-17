@@ -158,29 +158,6 @@ def lambda_handler(event, context):
                     customer_id
                 )
 
-            # Customers cannot create orders
-            if (
-                request_path.rstrip("/") == "/orders"
-                and request_method == "POST"
-            ):
-                print("Customer is not authorized to POST /orders")
-
-                return generate_policy(
-                    f"cloudmart-customer-{customer_id}",
-                    "Deny",
-                    method_arn,
-                    "CUSTOMER",
-                    customer_id
-                )
-
-            return generate_policy(
-                f"cloudmart-customer-{customer_id}",
-                "Allow",
-                method_arn,
-                "CUSTOMER",
-                customer_id
-            )
-
     except Exception as error:
         print(f"Authorization lookup failed: {error}")
 
