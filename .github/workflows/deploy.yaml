@@ -7,12 +7,12 @@ on:
       - milestone-4
     paths:
       - 'cloudformation/**'
+      - 'authorizer-code/**'
       - 'product-lambda/**'
+      - 'customer-lambda/**'
       - 'order-lambda/**'
       - 'order-processor-lambda/**'
-      - 'customer-lambda/**'
       - 'database-init-lambda/**'
-      - 'database/**'
       - '.github/workflows/deploy.yaml'
 
   workflow_dispatch:
@@ -101,35 +101,6 @@ jobs:
           else
             echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
           fi
-
-      # --------------------------------------------------------
-      # First deployment / RDS + S3
-      # --------------------------------------------------------
-
-      - name: Check Data Stack
-        id: check-data-stack
-        run: |
-          if aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Deploy Data Stack First Time
-        if: steps.check-data-stack.outputs.exists == 'false'
-        run: |
-          aws cloudformation validate-template \
-            --template-body file://cloudformation/data-stack.yaml
-
-          aws cloudformation deploy \
-            --template-file cloudformation/data-stack.yaml \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
 
       # --------------------------------------------------------
       # Get bucket after first deployment
