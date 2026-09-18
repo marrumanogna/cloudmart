@@ -2,7 +2,7 @@ import os
 import pymysql
 import boto3
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 
 app = Flask(__name__)
 
@@ -413,7 +413,9 @@ def reports():
         "reports.html",
         reports=reports
     )
-
+@app.route("/logout")
+def logout():
+    return redirect(url_for("dashboard"))
 
 @app.errorhandler(Exception)
 def handle_error(error):
