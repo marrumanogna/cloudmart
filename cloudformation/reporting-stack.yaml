@@ -211,12 +211,17 @@ Resources:
 
       InstanceType: t3.micro
 
-      SubnetId:
-        Fn::ImportValue: !Sub CloudMart-${Environment}-PublicSubnetId
+      NetworkInterfaces:
 
-      SecurityGroupIds:
+        - DeviceIndex: "0"
 
-        - Fn::ImportValue: !Sub CloudMart-${Environment}-Ec2SecurityGroupId
+          AssociatePublicIpAddress: true
+
+          SubnetId:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-PublicSubnetId
+
+          GroupSet:
+            - Fn::ImportValue: !Sub CloudMart-${Environment}-Ec2SecurityGroupId
 
       IamInstanceProfile:
         !Ref DashboardInstanceProfile
@@ -355,29 +360,6 @@ Resources:
                 Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
 
-  # ============================================================
-  # ELASTIC IP
-  # ============================================================
-
-  DashboardElasticIp:
-    Type: AWS::EC2::EIP
-
-    Properties:
-      Domain: vpc
-
-
-  DashboardElasticIpAssociation:
-    Type: AWS::EC2::EIPAssociation
-
-    Properties:
-
-      AllocationId:
-        !GetAtt DashboardElasticIp.AllocationId
-
-      InstanceId:
-        !Ref DashboardInstance
-
-
 # ==============================================================
 # OUTPUTS
 # ==============================================================
@@ -394,7 +376,7 @@ Outputs:
 
   DashboardPublicIp:
     Description: CloudMart Dashboard Public IP
-    Value: !Ref DashboardElasticIp
+    Value: !GetAtt DashboardInstance.PublicIp
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardPublicIp
@@ -402,7 +384,7 @@ Outputs:
 
   DashboardUrl:
     Description: CloudMart Dashboard URL
-    Value: !Sub http://${DashboardElasticIp}
+    Value: !Sub http://${DashboardInstance.PublicIp}
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardUrl
