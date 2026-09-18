@@ -422,7 +422,12 @@ def handle_error(error):
         "error.html",
         error=str(error)
     ), 500
-
+@app.route("/health")
+def health():
+    return {
+        "status": "ok",
+        "service": "cloudmart-dashboard"
+    }, 200
 
 if __name__ == "__main__":
     app.run(

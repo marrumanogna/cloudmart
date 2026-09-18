@@ -237,40 +237,84 @@ Resources:
 
 
       UserData:
-
         Fn::Base64:
-
           !Sub
-
             - |
-
               #!/bin/bash
 
-              set -e
+              set -euxo pipefail
 
-              echo "Starting CloudMart Dashboard setup..."
+              exec > >(tee -a /var/log/cloudmart-dashboard-setup.log) 2>&1
+
+              echo "===== CloudMart Dashboard Setup Started ====="
+
+              # ------------------------------------------------
+              # Install required packages
+              # ------------------------------------------------
 
               dnf update -y
 
-              dnf install -y python3 python3-pip nginx unzip
+              dnf install -y \
+                python3 \
+                python3-pip \
+                nginx \
+                unzip
+
+              # ------------------------------------------------
+              # Make sure AWS CLI exists
+              # ------------------------------------------------
+
+              if ! command -v aws >/dev/null 2>&1; then
+                dnf install -y awscli2
+              fi
+
+              aws --version
+
+              # ------------------------------------------------
+              # Create dashboard directory
+              # ------------------------------------------------
 
               mkdir -p /opt/cloudmart-dashboard
 
+              # ------------------------------------------------
+              # Download dashboard package
+              # ------------------------------------------------
+
               aws s3 cp \
-                s3://${ArtifactsBucket}/dashboard/cloudmart-dashboard.zip \
+                "s3://${ArtifactsBucket}/dashboard/cloudmart-dashboard.zip" \
                 /tmp/cloudmart-dashboard.zip
+
+              # ------------------------------------------------
+              # Extract dashboard
+              # ------------------------------------------------
 
               rm -rf /opt/cloudmart-dashboard/*
 
               unzip \
+                -o \
                 /tmp/cloudmart-dashboard.zip \
                 -d /opt/cloudmart-dashboard
 
+              # ------------------------------------------------
+              # Create Python virtual environment
+              # ------------------------------------------------
+
+              python3 -m venv /opt/cloudmart-dashboard/venv
+
+              /opt/cloudmart-dashboard/venv/bin/pip install --upgrade pip
+
+              /opt/cloudmart-dashboard/venv/bin/pip install \
+                -r /opt/cloudmart-dashboard/requirements.txt
+
+              # ------------------------------------------------
+              # Set ownership
+              # ------------------------------------------------
+
               chown -R ec2-user:ec2-user /opt/cloudmart-dashboard
 
-              cd /opt/cloudmart-dashboard
-
-              pip3 install -r requirements.txt
+              # ------------------------------------------------
+              # Environment variables
+              # ------------------------------------------------
 
               cat > /etc/cloudmart-dashboard.env <<EOF
               AWS_REGION=${AWS::Region}
@@ -282,18 +326,25 @@ Resources:
               DB_PASSWORD_PARAMETER=/cloudmart/${Environment}/rds/password
               EOF
 
+              chmod 600 /etc/cloudmart-dashboard.env
+
+              # ------------------------------------------------
+              # Flask/Gunicorn systemd service
+              # ------------------------------------------------
+
               cat > /etc/systemd/system/cloudmart-dashboard.service <<EOF
 
               [Unit]
               Description=CloudMart Flask Dashboard
-              After=network.target
+              After=network-online.target
+              Wants=network-online.target
 
               [Service]
               User=ec2-user
               Group=ec2-user
               WorkingDirectory=/opt/cloudmart-dashboard
               EnvironmentFile=/etc/cloudmart-dashboard.env
-              ExecStart=/usr/local/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
+              ExecStart=/opt/cloudmart-dashboard/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
               Restart=always
               RestartSec=5
 
@@ -301,6 +352,12 @@ Resources:
               WantedBy=multi-user.target
 
               EOF
+
+              # ------------------------------------------------
+              # Nginx configuration
+              # ------------------------------------------------
+
+              rm -f /etc/nginx/conf.d/default.conf
 
               cat > /etc/nginx/conf.d/cloudmart-dashboard.conf <<EOF
 
@@ -328,13 +385,19 @@ Resources:
 
               EOF
 
+              # ------------------------------------------------
+              # Start dashboard
+              # ------------------------------------------------
+
               systemctl daemon-reload
 
               systemctl enable cloudmart-dashboard
 
               systemctl start cloudmart-dashboard
 
-              rm -f /etc/nginx/conf.d/default.conf
+              # ------------------------------------------------
+              # Validate Nginx
+              # ------------------------------------------------
 
               nginx -t
 
@@ -342,7 +405,15 @@ Resources:
 
               systemctl restart nginx
 
-              echo "CloudMart Dashboard setup completed."
+              # ------------------------------------------------
+              # Verify services
+              # ------------------------------------------------
+
+              systemctl is-active --quiet cloudmart-dashboard
+
+              systemctl is-active --quiet nginx
+
+              echo "===== CloudMart Dashboard Setup Completed ====="
 
             - ArtifactsBucket:
                 Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
