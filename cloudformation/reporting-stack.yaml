@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 
 Description: CloudMart Reporting and EC2 Dashboard Stack
 
+
+# ============================================================
+# PARAMETERS
+# ============================================================
+
 Parameters:
 
   Environment:
@@ -13,7 +18,12 @@ Parameters:
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
 
 
+# ============================================================
+# RESOURCES
+# ============================================================
+
 Resources:
+
 
   # ============================================================
   # DAILY REPORT SCHEDULE
@@ -24,13 +34,17 @@ Resources:
 
     Properties:
       Name: !Sub cloudmart-daily-report-${Environment}
+
       Description: Run CloudMart Report Lambda once every day
+
       ScheduleExpression: rate(1 day)
+
       State: ENABLED
 
       Targets:
         - Arn:
             Fn::ImportValue: !Sub CloudMart-${Environment}-ReportLambdaArn
+
           Id: CloudMartReportLambda
 
 
@@ -61,7 +75,9 @@ Resources:
 
     Properties:
 
-      RoleName: !Sub cloudmart-dashboard-ec2-role-${Environment}
+      # --------------------------------------------------------
+      # EC2 assumes this role
+      # --------------------------------------------------------
 
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -77,11 +93,26 @@ Resources:
               - sts:AssumeRole
 
 
+      # --------------------------------------------------------
+      # AWS managed policy
+      # --------------------------------------------------------
+      # Required for AWS Systems Manager Session Manager
+      # --------------------------------------------------------
+
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+
+      # --------------------------------------------------------
+      # CUSTOM POLICIES
+      # --------------------------------------------------------
+
       Policies:
 
-        # --------------------------------------------------------
+
+        # ------------------------------------------------------
         # Upload bootstrap log to S3
-        # --------------------------------------------------------
+        # ------------------------------------------------------
 
         - PolicyName: DashboardBootstrapLogs
 
@@ -89,6 +120,7 @@ Resources:
             Version: '2012-10-17'
 
             Statement:
+
               - Effect: Allow
 
                 Action:
@@ -101,9 +133,9 @@ Resources:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
 
 
-        # --------------------------------------------------------
-        # Read dashboard package
-        # --------------------------------------------------------
+        # ------------------------------------------------------
+        # Read dashboard package from S3
+        # ------------------------------------------------------
 
         - PolicyName: DashboardArtifactsRead
 
@@ -111,6 +143,7 @@ Resources:
             Version: '2012-10-17'
 
             Statement:
+
               - Effect: Allow
 
                 Action:
@@ -123,9 +156,9 @@ Resources:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
 
 
-        # --------------------------------------------------------
-        # Read generated reports
-        # --------------------------------------------------------
+        # ------------------------------------------------------
+        # Read generated reports from S3
+        # ------------------------------------------------------
 
         - PolicyName: DashboardReportsRead
 
@@ -134,6 +167,7 @@ Resources:
 
             Statement:
 
+              # List reports bucket
               - Effect: Allow
 
                 Action:
@@ -146,6 +180,7 @@ Resources:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
 
 
+              # Read report files
               - Effect: Allow
 
                 Action:
@@ -158,9 +193,9 @@ Resources:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
 
 
-        # --------------------------------------------------------
-        # Read RDS credentials from SSM
-        # --------------------------------------------------------
+        # ------------------------------------------------------
+        # Read RDS credentials from SSM Parameter Store
+        # ------------------------------------------------------
 
         - PolicyName: DashboardSSMRead
 
@@ -168,6 +203,7 @@ Resources:
             Version: '2012-10-17'
 
             Statement:
+
               - Effect: Allow
 
                 Action:
@@ -219,15 +255,29 @@ Resources:
   # DASHBOARD EC2
   # ============================================================
 
-  DashboardInstanceV3:
+  DashboardInstanceV4:
     Type: AWS::EC2::Instance
 
     Properties:
 
+      # --------------------------------------------------------
+      # Amazon Linux 2023 AMI
+      # --------------------------------------------------------
+
       ImageId:
         Ref: LatestAmiId
 
+
+      # --------------------------------------------------------
+      # Instance type
+      # --------------------------------------------------------
+
       InstanceType: t3.micro
+
+
+      # --------------------------------------------------------
+      # Network configuration
+      # --------------------------------------------------------
 
       NetworkInterfaces:
 
@@ -242,18 +292,30 @@ Resources:
             - Fn::ImportValue: !Sub CloudMart-${Environment}-Ec2SecurityGroupId
 
 
+      # --------------------------------------------------------
+      # IAM instance profile
+      # --------------------------------------------------------
+
       IamInstanceProfile:
         !Ref DashboardInstanceProfile
 
 
+      # --------------------------------------------------------
+      # EC2 tags
+      # --------------------------------------------------------
+
       Tags:
 
         - Key: Name
-          Value: !Sub cloudmart-dashboard-${Environment}-v2
+          Value: !Sub cloudmart-dashboard-${Environment}-v3
 
         - Key: Project
           Value: CloudMart
 
+
+      # ========================================================
+      # EC2 BOOTSTRAP
+      # ========================================================
 
       UserData:
         Fn::Base64:
@@ -267,17 +329,24 @@ Resources:
 
               exec > >(tee -a "$LOG_FILE") 2>&1
 
+
+              # ==================================================
+              # UPLOAD BOOTSTRAP LOG ON EXIT
+              # ==================================================
+
               trap '
                 aws s3 cp "$LOG_FILE" \
                   "s3://${ArtifactsBucket}/dashboard-logs/bootstrap.log" \
                   || true
               ' EXIT
 
+
               echo "===== CloudMart Dashboard Bootstrap Started ====="
 
-              # ------------------------------------------------
-              # Install required packages
-              # ------------------------------------------------
+
+              # ==================================================
+              # INSTALL REQUIRED PACKAGES
+              # ==================================================
 
               dnf install -y \
                 python3 \
@@ -285,26 +354,31 @@ Resources:
                 nginx \
                 unzip
 
+
               # Amazon Linux 2023 includes AWS CLI v2
+
               aws --version
 
-              # ------------------------------------------------
-              # Dashboard directory
-              # ------------------------------------------------
+
+              # ==================================================
+              # DASHBOARD DIRECTORY
+              # ==================================================
 
               mkdir -p /opt/cloudmart-dashboard
 
-              # ------------------------------------------------
-              # Download dashboard package
-              # ------------------------------------------------
+
+              # ==================================================
+              # DOWNLOAD DASHBOARD PACKAGE
+              # ==================================================
 
               aws s3 cp \
                 "s3://${ArtifactsBucket}/dashboard/cloudmart-dashboard.zip" \
                 /tmp/cloudmart-dashboard.zip
 
-              # ------------------------------------------------
-              # Extract dashboard
-              # ------------------------------------------------
+
+              # ==================================================
+              # EXTRACT DASHBOARD
+              # ==================================================
 
               rm -rf /opt/cloudmart-dashboard/*
 
@@ -312,28 +386,33 @@ Resources:
                 /tmp/cloudmart-dashboard.zip \
                 -d /opt/cloudmart-dashboard
 
-              # ------------------------------------------------
-              # Create Python virtual environment
-              # ------------------------------------------------
+
+              # ==================================================
+              # CREATE PYTHON VIRTUAL ENVIRONMENT
+              # ==================================================
 
               python3 -m venv /opt/cloudmart-dashboard/venv
+
 
               /opt/cloudmart-dashboard/venv/bin/pip install \
                 --upgrade pip
 
+
               /opt/cloudmart-dashboard/venv/bin/pip install \
                 -r /opt/cloudmart-dashboard/requirements.txt
 
-              # ------------------------------------------------
-              # Set ownership
-              # ------------------------------------------------
+
+              # ==================================================
+              # SET OWNERSHIP
+              # ==================================================
 
               chown -R ec2-user:ec2-user \
                 /opt/cloudmart-dashboard
 
-              # ------------------------------------------------
-              # Environment variables
-              # ------------------------------------------------
+
+              # ==================================================
+              # ENVIRONMENT VARIABLES
+              # ==================================================
 
               cat > /etc/cloudmart-dashboard.env <<EOF
               AWS_REGION=${AWS::Region}
@@ -345,11 +424,13 @@ Resources:
               DB_PASSWORD_PARAMETER=/cloudmart/${Environment}/rds/password
               EOF
 
+
               chmod 600 /etc/cloudmart-dashboard.env
 
-              # ------------------------------------------------
-              # Gunicorn systemd service
-              # ------------------------------------------------
+
+              # ==================================================
+              # GUNICORN SYSTEMD SERVICE
+              # ==================================================
 
               cat > /etc/systemd/system/cloudmart-dashboard.service <<EOF
 
@@ -372,11 +453,13 @@ Resources:
 
               EOF
 
-              # ------------------------------------------------
-              # Nginx configuration
-              # ------------------------------------------------
+
+              # ==================================================
+              # NGINX CONFIGURATION
+              # ==================================================
 
               rm -f /etc/nginx/conf.d/default.conf
+
 
               cat > /etc/nginx/conf.d/cloudmart-dashboard.conf <<EOF
 
@@ -401,9 +484,10 @@ Resources:
 
               EOF
 
-              # ------------------------------------------------
-              # Start dashboard service
-              # ------------------------------------------------
+
+              # ==================================================
+              # START DASHBOARD SERVICE
+              # ==================================================
 
               systemctl daemon-reload
 
@@ -411,13 +495,16 @@ Resources:
 
               systemctl start cloudmart-dashboard
 
+
               sleep 5
+
 
               systemctl --no-pager status cloudmart-dashboard
 
-              # ------------------------------------------------
-              # Start Nginx
-              # ------------------------------------------------
+
+              # ==================================================
+              # START NGINX
+              # ==================================================
 
               nginx -t
 
@@ -425,19 +512,24 @@ Resources:
 
               systemctl restart nginx
 
+
               sleep 3
+
 
               systemctl --no-pager status nginx
 
-              # ------------------------------------------------
-              # Local health checks
-              # ------------------------------------------------
+
+              # ==================================================
+              # LOCAL HEALTH CHECKS
+              # ==================================================
 
               curl -f http://127.0.0.1:8000/health
 
               curl -f http://127.0.0.1/health
 
+
               echo "===== CloudMart Dashboard Bootstrap Completed ====="
+
 
             - ArtifactsBucket:
                 Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
@@ -461,32 +553,53 @@ Resources:
 
 Outputs:
 
+
+  # ============================================================
+  # DASHBOARD INSTANCE ID
+  # ============================================================
+
   DashboardInstanceId:
     Description: CloudMart Dashboard EC2 Instance ID
-    Value: !Ref DashboardInstanceV3
+
+    Value: !Ref DashboardInstanceV4
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardInstanceId
 
 
+  # ============================================================
+  # DASHBOARD PUBLIC IP
+  # ============================================================
+
   DashboardPublicIp:
     Description: CloudMart Dashboard Public IP
-    Value: !GetAtt DashboardInstanceV3.PublicIp
+
+    Value: !GetAtt DashboardInstanceV4.PublicIp
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardPublicIp
 
 
+  # ============================================================
+  # DASHBOARD URL
+  # ============================================================
+
   DashboardUrl:
     Description: CloudMart Dashboard URL
-    Value: !Sub http://${DashboardInstanceV3.PublicIp}
+
+    Value: !Sub http://${DashboardInstanceV4.PublicIp}
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardUrl
 
 
+  # ============================================================
+  # DAILY REPORT SCHEDULE ARN
+  # ============================================================
+
   DailyReportScheduleArn:
     Description: Daily report EventBridge rule
+
     Value: !GetAtt DailyReportSchedule.Arn
 
     Export:
