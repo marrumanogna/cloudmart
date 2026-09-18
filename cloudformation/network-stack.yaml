@@ -197,7 +197,7 @@ Resources:
               - ec2:StartInstances
               - ec2:CreateTags
             Resource: "*"
-            
+
           - Sid: SSMReadForParameters
             Effect: Allow
             Action:
@@ -370,8 +370,10 @@ Resources:
               - ssm:DeleteParameter
               - ssm:AddTagsToResource
               - ssm:RemoveTagsFromResource
+              - ssm:GetServiceSetting
+              - ssm:UpdateServiceSetting
             Resource: "*"
-
+            
           - Sid: LambdaDeployment
             Effect: Allow
             Action:

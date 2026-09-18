@@ -23,7 +23,13 @@ Parameters:
 # ============================================================
 
 Resources:
-
+  DefaultEc2InstanceManagementRole:
+    Type: AWS::SSM::ServiceSetting
+    DependsOn:
+      - DashboardEc2Role
+    Properties:
+      SettingId: /ssm/managed-instance/default-ec2-instance-management-role
+      SettingValue: !GetAtt DashboardEc2Role.Arn
 
   # ============================================================
   # DAILY REPORT SCHEDULE
@@ -368,13 +374,36 @@ Resources:
 
 
               # ==================================================
+              # WAIT FOR EC2 IAM CREDENTIALS
+              # ==================================================
+
+              echo "===== Waiting for EC2 IAM credentials ====="
+
+              for i in {1..30}; do
+
+                if aws sts get-caller-identity >/dev/null 2>&1; then
+                  echo "EC2 IAM credentials are available."
+                  aws sts get-caller-identity
+                  break
+                fi
+
+                echo "IAM credentials not available yet. Waiting 10 seconds..."
+                sleep 10
+
+              done
+
+              # Fail if credentials never became available
+              aws sts get-caller-identity
+
+              # ==================================================
               # DOWNLOAD DASHBOARD PACKAGE
               # ==================================================
+
+              echo "===== Downloading CloudMart Dashboard ====="
 
               aws s3 cp \
                 "s3://${ArtifactsBucket}/dashboard/cloudmart-dashboard.zip" \
                 /tmp/cloudmart-dashboard.zip
-
 
               # ==================================================
               # EXTRACT DASHBOARD
