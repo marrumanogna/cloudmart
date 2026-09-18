@@ -391,7 +391,7 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-low-stock-${Environment}
 
-  LowStockSubscription:
+  LowStockSubscriptionV2:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
@@ -407,7 +407,7 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-order-confirmed-${Environment}
 
-  OrderConfirmedEmailSubscription:
+  OrderConfirmedEmailSubscriptionV2:
     Type: AWS::SNS::Subscription
     DeletionPolicy: Delete
     Properties:
@@ -471,7 +471,7 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-order-placed-${Environment}
 
-  OrderPlacedEmailSubscription:
+  OrderPlacedEmailSubscriptionV2: 
     Type: AWS::SNS::Subscription
     DeletionPolicy: Delete
     Properties:
@@ -575,7 +575,7 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-order-failed-${Environment}
 
-  OrderFailedEmailSubscription:
+  OrderFailedEmailSubscriptionV2:
     Type: AWS::SNS::Subscription
     DeletionPolicy: Delete
     Properties:
