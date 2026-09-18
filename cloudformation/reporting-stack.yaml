@@ -219,7 +219,7 @@ Resources:
   # DASHBOARD EC2
   # ============================================================
 
-  DashboardInstanceV2:
+  DashboardInstanceV3:
     Type: AWS::EC2::Instance
 
     Properties:
@@ -283,8 +283,7 @@ Resources:
                 python3 \
                 python3-pip \
                 nginx \
-                unzip \
-                curl
+                unzip
 
               # Amazon Linux 2023 includes AWS CLI v2
               aws --version
@@ -464,7 +463,7 @@ Outputs:
 
   DashboardInstanceId:
     Description: CloudMart Dashboard EC2 Instance ID
-    Value: !Ref DashboardInstanceV2
+    Value: !Ref DashboardInstanceV3
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardInstanceId
@@ -472,7 +471,7 @@ Outputs:
 
   DashboardPublicIp:
     Description: CloudMart Dashboard Public IP
-    Value: !GetAtt DashboardInstanceV2.PublicIp
+    Value: !GetAtt DashboardInstanceV3.PublicIp
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardPublicIp
@@ -480,7 +479,7 @@ Outputs:
 
   DashboardUrl:
     Description: CloudMart Dashboard URL
-    Value: !Sub http://${DashboardInstanceV2.PublicIp}
+    Value: !Sub http://${DashboardInstanceV3.PublicIp}
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardUrl
