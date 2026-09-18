@@ -29,7 +29,7 @@ Resources:
       - DashboardEc2Role
     Properties:
       SettingId: /ssm/managed-instance/default-ec2-instance-management-role
-      SettingValue: !GetAtt DashboardEc2Role.Arn
+      SettingValue: !Ref DashboardEc2Role
 
   # ============================================================
   # DAILY REPORT SCHEDULE
