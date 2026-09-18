@@ -544,7 +544,6 @@ Resources:
               total_amount: "$.detail.total_amount"
               status: "$.detail.status"
             InputTemplate: '"ORDER CONFIRMED - CLOUDMART | Order ID: <order_id> | Customer ID: <customer_id> | Total Amount: ₹<total_amount> | Status: <status> | Your order has been confirmed."'
-
   OrderConfirmedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
