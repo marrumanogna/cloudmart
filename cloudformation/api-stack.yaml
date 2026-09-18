@@ -320,6 +320,9 @@ Resources:
 
       Policies:
 
+        # --------------------------------------------------------
+        # SSM - Read RDS credentials
+        # --------------------------------------------------------
         - PolicyName: ReportLambdaSSM
           PolicyDocument:
             Version: '2012-10-17'
@@ -330,6 +333,9 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
+        # --------------------------------------------------------
+        # S3 - Write daily reports
+        # --------------------------------------------------------
         - PolicyName: ReportLambdaS3
           PolicyDocument:
             Version: '2012-10-17'
@@ -340,25 +346,34 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - !Sub
-                    - arn:${AWS::Partition}:s3:::${Bucket}/*
+                    - arn:${AWS::Partition}:s3:::${Bucket}/reports/*
                     - Bucket:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
+
+        # --------------------------------------------------------
+        # CloudWatch Logs + Metrics
+        # --------------------------------------------------------
         - PolicyName: ReportLambdaCloudWatch
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-report-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-report-${Environment}:*
 
               - Effect: Allow
                 Action:
                   - cloudwatch:PutMetricData
                 Resource: '*'
+
+        # --------------------------------------------------------
+        # VPC access
+        # --------------------------------------------------------
         - PolicyName: ReportLambdaVpcAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -370,7 +385,6 @@ Resources:
                   - ec2:DescribeSubnets
                   - ec2:DeleteNetworkInterface
                 Resource: '*'
-
 
   # ============================================================
   # EVENTBRIDGE
@@ -794,8 +808,11 @@ Resources:
       Runtime: python3.11
       Handler: index.lambda_handler
       Role: !GetAtt ReportLambdaRole.Arn
-      Timeout: 30
+
+      Timeout: 60
       MemorySize: 256
+
+      CodeUri: ../report-lambda-package/
 
       VpcConfig:
         SubnetIds:
@@ -807,29 +824,24 @@ Resources:
 
       Environment:
         Variables:
+
           ENVIRONMENT: !Ref Environment
 
           REPORTS_BUCKET:
             Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
 
-      InlineCode: |
-          import json
-          import os
+          DB_HOST:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
 
-          def lambda_handler(event, context):
+          DB_PORT:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
 
-              print(json.dumps({
-                  "message": "Report Lambda invoked",
-                  "environment": os.environ["ENVIRONMENT"],
-                  "request_id": context.aws_request_id
-              }))
+          DB_NAME:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-              return {
-                  "statusCode": 200,
-                  "body": json.dumps({
-                      "message": "Report service is deployed"
-                  })
-              }
+          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
+
+          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
 
 
   # ============================================================

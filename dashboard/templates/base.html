@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CloudMart Dashboard</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+<div class="layout">
+
+    <aside class="sidebar">
+
+        <div class="logo">
+            <div class="logo-icon">C</div>
+            <div>
+                <h2>CloudMart</h2>
+                <span>Admin Console</span>
+            </div>
+        </div>
+
+        <nav>
+
+            <a href="{{ url_for('dashboard') }}"
+               class="nav-item">
+                <span>▦</span>
+                Dashboard
+            </a>
+
+            <a href="{{ url_for('products') }}"
+               class="nav-item">
+                <span>▣</span>
+                Products
+            </a>
+
+            <a href="{{ url_for('customers') }}"
+               class="nav-item">
+                <span>◉</span>
+                Customers
+            </a>
+
+            <a href="{{ url_for('orders') }}"
+               class="nav-item">
+                <span>◫</span>
+                Orders
+            </a>
+
+            <a href="{{ url_for('order_items') }}"
+               class="nav-item">
+                <span>≡</span>
+                Order Items
+            </a>
+
+            <a href="{{ url_for('history') }}"
+               class="nav-item">
+                <span>◷</span>
+                History
+            </a>
+
+            <a href="{{ url_for('reports') }}"
+               class="nav-item">
+                <span>▤</span>
+                Reports
+            </a>
+
+        </nav>
+
+        <div class="sidebar-bottom">
+            <a href="{{ url_for('logout') }}" class="nav-item">
+                <span>↪</span>
+                Logout
+            </a>
+        </div>
+
+    </aside>
+
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <div>
+                <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+                <p class="subtitle">
+                    CloudMart Operations Console
+                </p>
+            </div>
+
+            <div class="environment">
+                <span class="status-dot"></span>
+                DEV
+            </div>
+
+        </header>
+
+
+        <section class="content">
+
+            {% block content %}
+            {% endblock %}
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

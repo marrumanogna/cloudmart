@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block page_title %}Customers{% endblock %}
+{% block content %}
+<div class="section">
+<div class="section-header"><h2>Customers</h2></div>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+{% for key in customers[0].keys() if customers %}
+<th>{{ key }}</th>
+{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for customer in customers %}
+<tr>
+{% for value in customer.values() %}
+<td>{{ value }}</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+{% endblock %}

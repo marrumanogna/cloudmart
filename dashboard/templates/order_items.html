@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block page_title %}Order Items{% endblock %}
+{% block content %}
+<div class="section">
+<div class="section-header"><h2>Order Items</h2></div>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+{% for key in items[0].keys() if items %}
+<th>{{ key }}</th>
+{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for item in items %}
+<tr>
+{% for value in item.values() %}
+<td>{{ value }}</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+{% endblock %}

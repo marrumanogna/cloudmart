@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block page_title %}Customer Details{% endblock %}
+{% block content %}
+<div class="section">
+<div class="section-header">
+<h2>Customer</h2>
+</div>
+<div style="padding:20px;">
+{% for key, value in customer.items() %}
+<p><strong>{{ key }}:</strong> {{ value }}</p>
+{% endfor %}
+</div>
+</div>
+
+<div class="section">
+<div class="section-header"><h2>Previous Orders</h2></div>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+{% for key in orders[0].keys() if orders %}
+<th>{{ key }}</th>
+{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for order in orders %}
+<tr>
+{% for value in order.values() %}
+<td>{{ value }}</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+{% endblock %}

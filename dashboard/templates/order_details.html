@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+Order Details
+{% endblock %}
+
+{% block content %}
+
+<div class="section">
+
+    <div class="section-header">
+        <div>
+            <h2>Order #{{ order.order_id }}</h2>
+            <p>Customer and order information</p>
+        </div>
+    </div>
+
+    <div style="padding: 24px;">
+
+        <div class="metrics">
+
+            <div class="metric-card">
+                <span>Customer</span>
+                <strong>{{ order.customer_name }}</strong>
+            </div>
+
+            <div class="metric-card">
+                <span>Email</span>
+                <strong>{{ order.customer_email }}</strong>
+            </div>
+
+            <div class="metric-card">
+                <span>Status</span>
+                <strong>{{ order.status }}</strong>
+            </div>
+
+            <div class="metric-card">
+                <span>Total Amount</span>
+                <strong>?{{ order.total_amount }}</strong>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<div class="section">
+
+    <div class="section-header">
+        <div>
+            <h2>Order Items</h2>
+            <p>Products included in this order</p>
+        </div>
+    </div>
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>Item ID</th>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for item in items %}
+
+                <tr>
+
+                    <td>{{ item.order_item_id }}</td>
+
+                    <td>
+                        <strong>{{ item.product_name }}</strong>
+                    </td>
+
+                    <td>{{ item.quantity }}</td>
+
+                    <td>?{{ item.unit_price }}</td>
+
+                    <td>?{{ item.item_total }}</td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+                    <td colspan="5">
+                        No items found for this order.
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

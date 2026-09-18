@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+Dashboard
+{% endblock %}
+
+{% block content %}
+
+<div class="metrics">
+
+    <div class="metric-card">
+        <span>Total Products</span>
+        <strong>{{ total_products }}</strong>
+    </div>
+
+    <div class="metric-card">
+        <span>Total Customers</span>
+        <strong>{{ total_customers }}</strong>
+    </div>
+
+    <div class="metric-card">
+        <span>Total Orders</span>
+        <strong>{{ total_orders }}</strong>
+    </div>
+
+    <div class="metric-card">
+        <span>Total Revenue</span>
+        <strong>₹{{ "%.2f"|format(total_revenue|float) }}</strong>
+    </div>
+
+    <div class="metric-card warning">
+        <span>Low Stock</span>
+        <strong>{{ low_stock }}</strong>
+    </div>
+
+    <div class="metric-card danger-card">
+        <span>Failed Orders</span>
+        <strong>{{ failed_orders }}</strong>
+    </div>
+
+</div>
+
+
+<div class="section">
+
+    <div class="section-header">
+
+        <div>
+            <h2>Best Selling Products</h2>
+            <p>Top products based on confirmed order quantities</p>
+        </div>
+
+        <a href="{{ url_for('products') }}"
+           class="button">
+            View Products
+        </a>
+
+    </div>
+
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Units Sold</th>
+                    <th>Current Stock</th>
+                    <th>Status</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for product in best_selling %}
+
+                <tr>
+
+                    <td>
+                        <strong>{{ product.name }}</strong>
+                    </td>
+
+                    <td>{{ product.category }}</td>
+
+                    <td>₹{{ product.price }}</td>
+
+                    <td>
+                        <strong>{{ product.units_sold }}</strong>
+                    </td>
+
+                    <td>{{ product.stock_count }}</td>
+
+                    <td>
+
+                        {% if product.stock_count == 0 %}
+
+                            <span class="badge danger">
+                                Out of Stock
+                            </span>
+
+                        {% elif product.stock_count <= 10 %}
+
+                            <span class="badge warning">
+                                Low Stock
+                            </span>
+
+                        {% else %}
+
+                            <span class="badge success">
+                                In Stock
+                            </span>
+
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+                    <td colspan="6">
+                        No products available.
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+<div class="section">
+
+    <div class="section-header">
+
+        <div>
+            <h2>Recent Orders</h2>
+            <p>Latest CloudMart transactions</p>
+        </div>
+
+        <a href="{{ url_for('orders') }}"
+           class="button">
+            View All Orders
+        </a>
+
+    </div>
+
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Created</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for order in recent_orders %}
+
+                <tr>
+
+                    <td>
+                        <a href="{{ url_for(
+                            'order_details',
+                            order_id=order.order_id
+                        ) }}">
+                            #{{ order.order_id }}
+                        </a>
+                    </td>
+
+                    <td>
+                        {{ order.customer_name }}
+                    </td>
+
+                    <td>
+                        <span class="badge">
+                            {{ order.status }}
+                        </span>
+                    </td>
+
+                    <td>
+                        ₹{{ order.total_amount }}
+                    </td>
+
+                    <td>
+                        {{ order.created_at }}
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

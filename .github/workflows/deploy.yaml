@@ -7,6 +7,8 @@ on:
       - milestone-4
     paths:
       - 'cloudformation/**'
+      - 'dashboard/**'
+      - 'report-lambda-package/**'
       - 'authorizer-code/**'
       - 'product-lambda/**'
       - 'customer-lambda/**'
@@ -275,3 +277,108 @@ jobs:
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs" \
             --output table
+  # ============================================================
+  # REPORTING / DASHBOARD
+  # ============================================================
+
+  deploy-reporting:
+    name: Deploy Reporting and Dashboard Stack
+    needs: deploy-api
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+
+      # --------------------------------------------------------
+      # Get Artifacts Bucket
+      # --------------------------------------------------------
+
+      - name: Get Artifacts Bucket
+        run: |
+          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
+            --output text)
+
+          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
+
+          echo "Artifacts bucket:"
+          echo "$ARTIFACTS_BUCKET"
+
+
+      # --------------------------------------------------------
+      # Package Dashboard
+      # --------------------------------------------------------
+
+      - name: Package Dashboard
+        run: |
+          cd dashboard
+
+          zip -r ../cloudmart-dashboard.zip .
+
+          cd ..
+
+          echo "Dashboard package created:"
+          ls -lh cloudmart-dashboard.zip
+
+
+      # --------------------------------------------------------
+      # Upload Dashboard Package
+      # --------------------------------------------------------
+
+      - name: Upload Dashboard Package
+        run: |
+          aws s3 cp \
+            cloudmart-dashboard.zip \
+            "s3://${ARTIFACTS_BUCKET}/dashboard/cloudmart-dashboard.zip"
+
+          echo "Dashboard package uploaded successfully."
+
+
+      # --------------------------------------------------------
+      # Validate Reporting Template
+      # --------------------------------------------------------
+
+      - name: Validate Reporting Template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/reporting-stack.yaml \
+            --region ${{ env.AWS_REGION }}
+
+
+      # --------------------------------------------------------
+      # Deploy Reporting Stack
+      # --------------------------------------------------------
+
+      - name: Deploy Reporting Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/reporting-stack.yaml \
+            --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset
+
+
+      # --------------------------------------------------------
+      # Show Dashboard URL
+      # --------------------------------------------------------
+
+      - name: Show Dashboard URL
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='DashboardUrl'].OutputValue" \
+            --output text

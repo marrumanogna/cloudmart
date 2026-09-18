@@ -1,1 +1,416 @@
+AWSTemplateFormatVersion: '2010-09-09'
 
+Description: CloudMart Reporting and EC2 Dashboard Stack
+
+Parameters:
+
+  Environment:
+    Type: String
+    Default: dev
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+
+Resources:
+
+  # ============================================================
+  # DAILY REPORT SCHEDULE
+  # ============================================================
+
+  DailyReportSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub cloudmart-daily-report-${Environment}
+      Description: Run CloudMart Report Lambda once every day
+      ScheduleExpression: rate(1 day)
+      State: ENABLED
+
+      Targets:
+        - Arn:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-ReportLambdaArn
+          Id: CloudMartReportLambda
+
+
+  # ============================================================
+  # ALLOW EVENTBRIDGE TO INVOKE REPORT LAMBDA
+  # ============================================================
+
+  DailyReportLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::ImportValue: !Sub CloudMart-${Environment}-ReportLambdaArn
+
+      Action: lambda:InvokeFunction
+
+      Principal: events.amazonaws.com
+
+      SourceArn: !GetAtt DailyReportSchedule.Arn
+
+
+  # ============================================================
+  # DASHBOARD EC2 IAM ROLE
+  # ============================================================
+
+  DashboardEc2Role:
+    Type: AWS::IAM::Role
+
+    Properties:
+
+      RoleName: !Sub cloudmart-dashboard-ec2-role-${Environment}
+
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+
+        Statement:
+
+          - Effect: Allow
+
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+
+            Action:
+              - sts:AssumeRole
+
+
+      Policies:
+
+        # --------------------------------------------------------
+        # Read dashboard artifact
+        # --------------------------------------------------------
+
+        - PolicyName: DashboardArtifactsRead
+
+          PolicyDocument:
+
+            Version: '2012-10-17'
+
+            Statement:
+
+              - Effect: Allow
+
+                Action:
+                  - s3:GetObject
+
+                Resource:
+                  - !Sub
+                    - arn:${AWS::Partition}:s3:::${Bucket}/dashboard/cloudmart-dashboard.zip
+                    - Bucket:
+                        Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
+
+
+        # --------------------------------------------------------
+        # Read generated reports
+        # --------------------------------------------------------
+
+        - PolicyName: DashboardReportsRead
+
+          PolicyDocument:
+
+            Version: '2012-10-17'
+
+            Statement:
+
+              - Effect: Allow
+
+                Action:
+                  - s3:ListBucket
+
+                Resource:
+                  - !Sub
+                    - arn:${AWS::Partition}:s3:::${Bucket}
+                    - Bucket:
+                        Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
+
+
+              - Effect: Allow
+
+                Action:
+                  - s3:GetObject
+
+                Resource:
+                  - !Sub
+                    - arn:${AWS::Partition}:s3:::${Bucket}/reports/*
+                    - Bucket:
+                        Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
+
+
+        # --------------------------------------------------------
+        # Read RDS credentials from SSM
+        # --------------------------------------------------------
+
+        - PolicyName: DashboardSSMRead
+
+          PolicyDocument:
+
+            Version: '2012-10-17'
+
+            Statement:
+
+              - Effect: Allow
+
+                Action:
+                  - ssm:GetParameter
+
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+
+
+  # ============================================================
+  # EC2 INSTANCE PROFILE
+  # ============================================================
+
+  DashboardInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+
+    Properties:
+
+      InstanceProfileName:
+        !Sub cloudmart-dashboard-profile-${Environment}
+
+      Roles:
+        - !Ref DashboardEc2Role
+
+
+  # ============================================================
+  # ALLOW DASHBOARD EC2 TO CONNECT TO RDS
+  # ============================================================
+
+  DashboardToRdsIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+
+    Properties:
+
+      GroupId:
+        Fn::ImportValue: !Sub CloudMart-${Environment}-RdsSecurityGroupId
+
+      SourceSecurityGroupId:
+        Fn::ImportValue: !Sub CloudMart-${Environment}-Ec2SecurityGroupId
+
+      IpProtocol: tcp
+
+      FromPort: 3306
+
+      ToPort: 3306
+
+
+  # ============================================================
+  # DASHBOARD EC2
+  # ============================================================
+
+  DashboardInstance:
+    Type: AWS::EC2::Instance
+
+    Properties:
+
+      ImageId:
+        Ref: LatestAmiId
+
+      InstanceType: t3.micro
+
+      SubnetId:
+        Fn::ImportValue: !Sub CloudMart-${Environment}-PublicSubnetId
+
+      SecurityGroupIds:
+
+        - Fn::ImportValue: !Sub CloudMart-${Environment}-Ec2SecurityGroupId
+
+      IamInstanceProfile:
+        !Ref DashboardInstanceProfile
+
+
+      Tags:
+
+        - Key: Name
+          Value: !Sub cloudmart-dashboard-${Environment}
+
+        - Key: Project
+          Value: CloudMart
+
+
+      UserData:
+
+        Fn::Base64:
+
+          !Sub
+
+            - |
+
+              #!/bin/bash
+
+              set -e
+
+              echo "Starting CloudMart Dashboard setup..."
+
+              dnf update -y
+
+              dnf install -y python3 python3-pip nginx unzip
+
+              mkdir -p /opt/cloudmart-dashboard
+
+              aws s3 cp \
+                s3://${ArtifactsBucket}/dashboard/cloudmart-dashboard.zip \
+                /tmp/cloudmart-dashboard.zip
+
+              rm -rf /opt/cloudmart-dashboard/*
+
+              unzip \
+                /tmp/cloudmart-dashboard.zip \
+                -d /opt/cloudmart-dashboard
+
+              chown -R ec2-user:ec2-user /opt/cloudmart-dashboard
+
+              cd /opt/cloudmart-dashboard
+
+              pip3 install -r requirements.txt
+
+              cat > /etc/cloudmart-dashboard.env <<EOF
+              AWS_REGION=${AWS::Region}
+              REPORTS_BUCKET=${ReportsBucket}
+              DB_HOST=${RdsEndpoint}
+              DB_PORT=${RdsPort}
+              DB_NAME=${DbName}
+              DB_USERNAME_PARAMETER=/cloudmart/${Environment}/rds/username
+              DB_PASSWORD_PARAMETER=/cloudmart/${Environment}/rds/password
+              EOF
+
+              cat > /etc/systemd/system/cloudmart-dashboard.service <<EOF
+
+              [Unit]
+              Description=CloudMart Flask Dashboard
+              After=network.target
+
+              [Service]
+              User=ec2-user
+              Group=ec2-user
+              WorkingDirectory=/opt/cloudmart-dashboard
+              EnvironmentFile=/etc/cloudmart-dashboard.env
+              ExecStart=/usr/local/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
+              Restart=always
+              RestartSec=5
+
+              [Install]
+              WantedBy=multi-user.target
+
+              EOF
+
+              cat > /etc/nginx/conf.d/cloudmart-dashboard.conf <<EOF
+
+              server {
+
+                  listen 80;
+
+                  server_name _;
+
+                  location / {
+
+                      proxy_pass http://127.0.0.1:8000;
+
+                      proxy_set_header Host \$host;
+
+                      proxy_set_header X-Real-IP \$remote_addr;
+
+                      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+
+                      proxy_set_header X-Forwarded-Proto \$scheme;
+
+                  }
+
+              }
+
+              EOF
+
+              systemctl daemon-reload
+
+              systemctl enable cloudmart-dashboard
+
+              systemctl start cloudmart-dashboard
+
+              rm -f /etc/nginx/conf.d/default.conf
+
+              nginx -t
+
+              systemctl enable nginx
+
+              systemctl restart nginx
+
+              echo "CloudMart Dashboard setup completed."
+
+            - ArtifactsBucket:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
+
+              ReportsBucket:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
+
+              RdsEndpoint:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
+
+              RdsPort:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
+
+              DbName:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
+
+
+  # ============================================================
+  # ELASTIC IP
+  # ============================================================
+
+  DashboardElasticIp:
+    Type: AWS::EC2::EIP
+
+    Properties:
+      Domain: vpc
+
+
+  DashboardElasticIpAssociation:
+    Type: AWS::EC2::EIPAssociation
+
+    Properties:
+
+      AllocationId:
+        !GetAtt DashboardElasticIp.AllocationId
+
+      InstanceId:
+        !Ref DashboardInstance
+
+
+# ==============================================================
+# OUTPUTS
+# ==============================================================
+
+Outputs:
+
+  DashboardInstanceId:
+    Description: CloudMart Dashboard EC2 Instance ID
+    Value: !Ref DashboardInstance
+
+    Export:
+      Name: !Sub CloudMart-${Environment}-DashboardInstanceId
+
+
+  DashboardPublicIp:
+    Description: CloudMart Dashboard Public IP
+    Value: !Ref DashboardElasticIp
+
+    Export:
+      Name: !Sub CloudMart-${Environment}-DashboardPublicIp
+
+
+  DashboardUrl:
+    Description: CloudMart Dashboard URL
+    Value: !Sub http://${DashboardElasticIp}
+
+    Export:
+      Name: !Sub CloudMart-${Environment}-DashboardUrl
+
+
+  DailyReportScheduleArn:
+    Description: Daily report EventBridge rule
+    Value: !GetAtt DailyReportSchedule.Arn
+
+    Export:
+      Name: !Sub CloudMart-${Environment}-DailyReportScheduleArn
