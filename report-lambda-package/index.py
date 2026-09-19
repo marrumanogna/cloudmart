@@ -2,7 +2,8 @@ import csv
 import io
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import boto3
 import pymysql
@@ -17,18 +18,27 @@ def get_parameter(name):
         Name=name,
         WithDecryption=True
     )
+
     return response["Parameter"]["Value"]
 
 
 def get_db_connection():
+    username = get_parameter(
+        os.environ["DB_USERNAME_PARAMETER"]
+    )
+
+    password = get_parameter(
+        os.environ["DB_PASSWORD_PARAMETER"]
+    )
+
     return pymysql.connect(
         host=os.environ["DB_HOST"],
-        port=int(os.environ.get("DB_PORT", "3306")),
-        user=get_parameter(os.environ["DB_USERNAME_PARAMETER"]),
-        password=get_parameter(os.environ["DB_PASSWORD_PARAMETER"]),
+        port=int(os.environ["DB_PORT"]),
+        user=username,
+        password=password,
         database=os.environ["DB_NAME"],
-        cursorclass=pymysql.cursors.DictCursor,
-        connect_timeout=10
+        connect_timeout=10,
+        cursorclass=pymysql.cursors.DictCursor
     )
 
 
@@ -37,78 +47,124 @@ def lambda_handler(event, context):
     connection = None
 
     try:
+        # Use India time so "today" matches the dashboard/report date.
+        report_date = datetime.now(
+            ZoneInfo("Asia/Kolkata")
+        ).date()
+
+        print(json.dumps({
+            "level": "INFO",
+            "message": "Starting daily report generation",
+            "report_date": str(report_date)
+        }))
+
         connection = get_db_connection()
 
         with connection.cursor() as cursor:
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     o.order_id,
                     o.customer_id,
-                    o.total_amount,
+                    c.name AS customer_name,
                     o.status,
-                    o.created_at
+                    o.total_amount,
+                    o.created_at,
+                    COUNT(oi.order_item_id) AS item_count,
+                    COALESCE(SUM(oi.quantity), 0) AS total_quantity
                 FROM orders o
+                LEFT JOIN customers c
+                    ON c.customer_id = o.customer_id
+                LEFT JOIN order_items oi
+                    ON oi.order_id = o.order_id
+                WHERE DATE(o.created_at) = %s
+                GROUP BY
+                    o.order_id,
+                    o.customer_id,
+                    c.name,
+                    o.status,
+                    o.total_amount,
+                    o.created_at
                 ORDER BY o.created_at DESC
-            """)
+                """,
+                (report_date,)
+            )
 
-            orders = cursor.fetchall()
+            rows = cursor.fetchall()
 
-        output = io.StringIO()
+        # Create CSV in memory.
+        csv_buffer = io.StringIO()
 
-        writer = csv.writer(output)
-
-        writer.writerow([
+        fieldnames = [
             "order_id",
             "customer_id",
-            "total_amount",
+            "customer_name",
             "status",
-            "created_at"
-        ])
+            "total_amount",
+            "created_at",
+            "item_count",
+            "total_quantity"
+        ]
 
-        for order in orders:
-            writer.writerow([
-                order["order_id"],
-                order["customer_id"],
-                order["total_amount"],
-                order["status"],
-                order["created_at"]
-            ])
-
-        csv_content = output.getvalue()
-
-        timestamp = datetime.now(timezone.utc).strftime(
-            "%Y-%m-%d-%H-%M-%S"
+        writer = csv.DictWriter(
+            csv_buffer,
+            fieldnames=fieldnames
         )
 
-        key = f"reports/daily-report-{timestamp}.csv"
+        writer.writeheader()
+
+        for row in rows:
+            writer.writerow({
+                "order_id": row["order_id"],
+                "customer_id": row["customer_id"],
+                "customer_name": row["customer_name"],
+                "status": row["status"],
+                "total_amount": row["total_amount"],
+                "created_at": row["created_at"],
+                "item_count": row["item_count"],
+                "total_quantity": row["total_quantity"]
+            })
+
+        bucket = os.environ["REPORTS_BUCKET"]
+
+        key = (
+            f"reports/daily_report_"
+            f"{report_date.isoformat()}.csv"
+        )
 
         s3.put_object(
-            Bucket=os.environ["REPORTS_BUCKET"],
+            Bucket=bucket,
             Key=key,
-            Body=csv_content.encode("utf-8"),
+            Body=csv_buffer.getvalue().encode("utf-8"),
             ContentType="text/csv"
         )
 
-        result = {
+        print(json.dumps({
+            "level": "INFO",
             "message": "Daily report generated successfully",
-            "bucket": os.environ["REPORTS_BUCKET"],
+            "bucket": bucket,
             "key": key,
-            "order_count": len(orders)
-        }
-
-        print(json.dumps(result))
+            "row_count": len(rows)
+        }))
 
         return {
             "statusCode": 200,
-            "body": json.dumps(result)
+            "body": json.dumps({
+                "message": "Daily report generated successfully",
+                "report_date": str(report_date),
+                "bucket": bucket,
+                "key": key,
+                "row_count": len(rows)
+            })
         }
 
-    except Exception as e:
+    except Exception as error:
 
         print(json.dumps({
-            "message": "Report generation failed",
-            "error": str(e)
+            "level": "ERROR",
+            "message": "Daily report generation failed",
+            "error": str(error)
         }))
 
         raise

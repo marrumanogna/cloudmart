@@ -808,11 +808,8 @@ Resources:
       Runtime: python3.11
       Handler: index.lambda_handler
       Role: !GetAtt ReportLambdaRole.Arn
-
       Timeout: 60
       MemorySize: 256
-
-      CodeUri: ../report-lambda-package/
 
       VpcConfig:
         SubnetIds:
@@ -821,11 +818,10 @@ Resources:
 
         SecurityGroupIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-LambdaSecurityGroupId
-
       Environment:
         Variables:
-
-          ENVIRONMENT: !Ref Environment
+          ENVIRONMENT:
+            Ref: Environment
 
           REPORTS_BUCKET:
             Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
@@ -839,11 +835,13 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
+          DB_USERNAME_PARAMETER:
+            !Sub /cloudmart/${Environment}/rds/username
 
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+          DB_PASSWORD_PARAMETER:
+            !Sub /cloudmart/${Environment}/rds/password
 
-
+      CodeUri: ../report-lambda-package/
   # ============================================================
   # API GATEWAY
   # ============================================================
