@@ -9,8 +9,8 @@ Parameters:
     Default: dev
 
   AlarmEmail:
-    Type: String
-    Description: Email address for CloudWatch alarm notifications
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: SSM parameter containing the alarm notification email
 
   DashboardInstanceId:
     Type: String

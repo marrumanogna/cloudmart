@@ -11,6 +11,9 @@ Parameters:
     AllowedValues:
       - dev
       - prod
+  NotificationEmail:
+    Type: String
+    Description: Email address for CloudMart SNS notifications
 
 Resources:
 
@@ -36,6 +39,7 @@ Resources:
                 - lambda.amazonaws.com
             Action:
               - sts:AssumeRole
+
 
       Policies:
 
@@ -217,9 +221,13 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                  - cloudwatch:PutMetricData
                 Resource:
                   - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-order-${Environment}:*
+
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
 
         - PolicyName: OrderLambdaVpcAccess
           PolicyDocument:
@@ -246,7 +254,7 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          
+
           - Effect: Allow
             Principal:
               Service:
@@ -283,9 +291,12 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                  - cloudwatch:PutMetricData
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-order-processor-${Environment}:*
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
 
         - PolicyName: OrderProcessorVpcAccess
           PolicyDocument:
@@ -429,9 +440,9 @@ Resources:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
-      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref LowStockTopic
-  
+
 # ============================================================
 # M4 ORDER CONFIRMATION SNS
 # ============================================================
@@ -446,13 +457,13 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref OrderConfirmedTopic
 
   #============================================================
   # M3 INVENTORY CHANGE EVENTBRIDGE RULE
   # ============================================================
-  
+
   InventoryChangeRule:
     Type: AWS::Events::Rule
     Properties:
@@ -505,12 +516,12 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-order-placed-${Environment}
 
-  OrderPlacedEmailSubscriptionV3: 
+  OrderPlacedEmailSubscriptionV3:
     Type: AWS::SNS::Subscription
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref OrderPlacedTopic
 
   OrderPlacedRule:
@@ -613,7 +624,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref OrderFailedTopic
 
   OrderFailedRule:

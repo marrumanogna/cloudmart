@@ -264,6 +264,7 @@ jobs:
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
+              NotificationEmail="/cloudmart/${{ env.ENVIRONMENT }}/notifications/email" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
 
@@ -402,7 +403,7 @@ jobs:
             --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
-              AlarmEmail=${{ secrets.ALARM_EMAIL }} \
+              AlarmEmail="/cloudmart/${{ env.ENVIRONMENT }}/notifications/email" \
               DashboardInstanceId=$DASHBOARD_INSTANCE_ID \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }} \
