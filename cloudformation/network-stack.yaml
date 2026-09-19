@@ -715,6 +715,7 @@ Resources:
         - !Ref PrivateSubnet2
       SecurityGroupIds:
         - !Ref VpcEndpointSecurityGroup
+        
   SnsVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -727,6 +728,7 @@ Resources:
         - !Ref PrivateSubnet2
       SecurityGroupIds:
         - !Ref VpcEndpointSecurityGroup
+
   SqsVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -739,6 +741,7 @@ Resources:
         - !Ref PrivateSubnet2
       SecurityGroupIds:
         - !Ref VpcEndpointSecurityGroup
+
   LambdaVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -751,6 +754,19 @@ Resources:
         - !Ref PrivateSubnet2
       SecurityGroupIds:
         - !Ref VpcEndpointSecurityGroup
+
+  CloudWatchMonitoringEndpoint:
+  Type: AWS::EC2::VPCEndpoint
+  Properties:
+    VpcId: !Ref VPC
+    VpcEndpointType: Interface
+    ServiceName: !Sub com.amazonaws.${AWS::Region}.monitoring
+    PrivateDnsEnabled: true
+    SubnetIds:
+      - !Ref PrivateSubnetId
+      - !Ref PrivateSubnet2Id
+    SecurityGroupIds:
+      - !Ref VpcEndpointSecurityGroup
 
 Outputs:
 

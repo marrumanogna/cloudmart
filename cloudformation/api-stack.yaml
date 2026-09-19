@@ -90,6 +90,10 @@ Resources:
                 - lambda.amazonaws.com
             Action:
               - sts:AssumeRole
+          - Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+            Resource: "*"
 
       Policies:
 
@@ -130,8 +134,7 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                   - cloudwatch:PutMetricData
-                Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-product-${Environment}:*
+                Resource: "*"
 
         - PolicyName: ProductLambdaVpcAccess
           PolicyDocument:
@@ -164,6 +167,14 @@ Resources:
                 - lambda.amazonaws.com
             Action:
               - sts:AssumeRole
+
+          - Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+            Resource: "*"
+            Condition:
+              StringEquals:
+                cloudwatch:namespace: CloudMart/Operations
 
       Policies:
 
@@ -235,12 +246,21 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
+          
           - Effect: Allow
             Principal:
               Service:
                 - lambda.amazonaws.com
             Action:
               - sts:AssumeRole
+
+          - Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+            Resource: "*"
+            Condition:
+              StringEquals:
+                cloudwatch:namespace: CloudMart/Operations
 
       Policies:
 

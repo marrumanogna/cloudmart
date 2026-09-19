@@ -155,7 +155,6 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
 
-
   # --------------------------------------------------------
   # Run Database Initialization Lambda
   # --------------------------------------------------------
@@ -168,8 +167,6 @@ jobs:
             database-init-response.json
 
           cat database-init-response.json
-
-
   # ============================================================
   # AUTH
   # ============================================================
@@ -223,7 +220,6 @@ jobs:
   # ============================================================
   # API / APPLICATION
   # ============================================================
-
   deploy-api:
     name: Deploy API and Application Stack
     needs: deploy-auth
@@ -297,8 +293,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-
-
       # --------------------------------------------------------
       # Get Artifacts Bucket
       # --------------------------------------------------------
@@ -314,8 +308,6 @@ jobs:
 
           echo "Artifacts bucket:"
           echo "$ARTIFACTS_BUCKET"
-
-
       # --------------------------------------------------------
       # Package Dashboard
       # --------------------------------------------------------
@@ -330,8 +322,6 @@ jobs:
 
           echo "Dashboard package created:"
           ls -lh cloudmart-dashboard.zip
-
-
       # --------------------------------------------------------
       # Upload Dashboard Package
       # --------------------------------------------------------
@@ -343,8 +333,6 @@ jobs:
             "s3://${ARTIFACTS_BUCKET}/dashboard/cloudmart-dashboard.zip"
 
           echo "Dashboard package uploaded successfully."
-
-
       # --------------------------------------------------------
       # Validate Reporting Template
       # --------------------------------------------------------
@@ -354,8 +342,6 @@ jobs:
           aws cloudformation validate-template \
             --template-body file://cloudformation/reporting-stack.yaml \
             --region ${{ env.AWS_REGION }}
-
-
       # --------------------------------------------------------
       # Deploy Reporting Stack
       # --------------------------------------------------------
@@ -370,8 +356,6 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }} \
             --no-fail-on-empty-changeset
-
-
       # --------------------------------------------------------
       # Show Dashboard URL
       # --------------------------------------------------------
@@ -382,3 +366,56 @@ jobs:
             --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='DashboardUrl'].OutputValue" \
             --output text
+      # --------------------------------------------------------
+      # Validate Monitoring Template
+      # --------------------------------------------------------
+
+      - name: Validate Monitoring Template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/monitoring-stack.yaml \
+            --region ${{ env.AWS_REGION }}
+
+      # --------------------------------------------------------
+      # Get Dashboard Instance ID
+      # --------------------------------------------------------
+
+      - name: Get Dashboard Instance ID
+        run: |
+          DASHBOARD_INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='DashboardInstanceId'].OutputValue" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          echo "DashboardInstanceId=$DASHBOARD_INSTANCE_ID"
+          echo "DASHBOARD_INSTANCE_ID=$DASHBOARD_INSTANCE_ID" >> "$GITHUB_ENV"
+
+      # --------------------------------------------------------
+      # Deploy Monitoring Stack
+      # --------------------------------------------------------
+
+      - name: Deploy Monitoring Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/monitoring-stack.yaml \
+            --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
+              AlarmEmail=${{ secrets.ALARM_EMAIL }} \
+              DashboardInstanceId=$DASHBOARD_INSTANCE_ID \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset
+
+      # --------------------------------------------------------
+      # Show Monitoring Dashboard
+      # --------------------------------------------------------
+
+      - name: Show Monitoring Dashboard
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='OperationsDashboardUrl'].OutputValue" \
+            --output text \
+            --region ${{ env.AWS_REGION }}

@@ -1,1 +1,265 @@
+AWSTemplateFormatVersion: '2010-09-09'
 
+Description: CloudMart Monitoring, CloudWatch Dashboard, Alarms and SNS Notifications
+
+Parameters:
+
+  Environment:
+    Type: String
+    Default: dev
+
+  AlarmEmail:
+    Type: String
+    Description: Email address for CloudWatch alarm notifications
+
+  DashboardInstanceId:
+    Type: String
+    Description: CloudMart Dashboard EC2 instance ID
+
+Resources:
+
+  AlarmNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub cloudmart-monitoring-alerts-${Environment}
+
+  AlarmEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmNotificationTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  OrdersFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub CloudMart-${Environment}-OrdersFailed
+      AlarmDescription: Orders failed during order processing
+      Namespace: CloudMart/Operations
+      MetricName: OrdersFailed
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmNotificationTopic
+
+  LowStockEventsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub CloudMart-${Environment}-LowStockEvents
+      AlarmDescription: Low stock event detected
+      Namespace: CloudMart/Operations
+      MetricName: LowStockEvents
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmNotificationTopic
+
+  DashboardCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub CloudMart-${Environment}-Dashboard-HighCPU
+      AlarmDescription: Dashboard EC2 CPU utilization is high
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref DashboardInstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmNotificationTopic
+
+  DashboardStatusCheckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub CloudMart-${Environment}-Dashboard-StatusCheck
+      AlarmDescription: Dashboard EC2 instance status check failed
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_Instance
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref DashboardInstanceId
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmNotificationTopic
+
+  CloudMartOperationsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: cloudmart-operations
+
+      DashboardBody: !Sub
+        - |
+          {
+            "widgets": [
+
+              {
+                "type": "metric",
+                "x": 0,
+                "y": 0,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "Orders Placed",
+                  "view": "timeSeries",
+                  "region": "${AWS::Region}",
+                  "period": 60,
+                  "stat": "Sum",
+                  "metrics": [
+                    [
+                      "CloudMart/Operations",
+                      "OrdersPlaced",
+                      "Environment",
+                      "${Environment}"
+                    ]
+                  ]
+                }
+              },
+
+              {
+                "type": "metric",
+                "x": 12,
+                "y": 0,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "Orders Failed",
+                  "view": "timeSeries",
+                  "region": "${AWS::Region}",
+                  "period": 60,
+                  "stat": "Sum",
+                  "metrics": [
+                    [
+                      "CloudMart/Operations",
+                      "OrdersFailed",
+                      "Environment",
+                      "${Environment}"
+                    ]
+                  ]
+                }
+              },
+
+              {
+                "type": "metric",
+                "x": 0,
+                "y": 6,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "Low Stock Events",
+                  "view": "timeSeries",
+                  "region": "${AWS::Region}",
+                  "period": 60,
+                  "stat": "Sum",
+                  "metrics": [
+                    [
+                      "CloudMart/Operations",
+                      "LowStockEvents",
+                      "Environment",
+                      "${Environment}"
+                    ]
+                  ]
+                }
+              },
+
+              {
+                "type": "metric",
+                "x": 12,
+                "y": 6,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "Dashboard EC2 CPU",
+                  "view": "timeSeries",
+                  "region": "${AWS::Region}",
+                  "period": 300,
+                  "stat": "Average",
+                  "metrics": [
+                    [
+                      "AWS/EC2",
+                      "CPUUtilization",
+                      "InstanceId",
+                      "${DashboardInstanceId}"
+                    ]
+                  ]
+                }
+              },
+
+              {
+                "type": "metric",
+                "x": 0,
+                "y": 12,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "title": "Dashboard EC2 Status Check",
+                  "view": "timeSeries",
+                  "region": "${AWS::Region}",
+                  "period": 60,
+                  "stat": "Maximum",
+                  "metrics": [
+                    [
+                      "AWS/EC2",
+                      "StatusCheckFailed_Instance",
+                      "InstanceId",
+                      "${DashboardInstanceId}"
+                    ]
+                  ]
+                }
+              },
+
+              {
+                "type": "text",
+                "x": 12,
+                "y": 12,
+                "width": 12,
+                "height": 6,
+                "properties": {
+                  "markdown": "# CloudMart Operations\n\nEnvironment: **${Environment}**\n\nMonitoring:\n- Orders placed\n- Orders failed\n- Low stock events\n- EC2 CPU\n- EC2 health"
+                }
+              }
+
+            ]
+          }
+        - DashboardInstanceId: !Ref DashboardInstanceId
+
+Outputs:
+
+  OperationsDashboardName:
+    Description: CloudWatch operations dashboard
+    Value: cloudmart-operations
+
+  OperationsDashboardUrl:
+    Description: CloudWatch dashboard URL
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=cloudmart-operations
+
+  AlarmTopicArn:
+    Description: SNS topic for monitoring alarms
+    Value: !Ref AlarmNotificationTopic

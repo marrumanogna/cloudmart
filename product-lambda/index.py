@@ -3,8 +3,29 @@ import os
 import boto3
 import pymysql
 
-ssm = boto3.client("ssm")
-events = boto3.client("events")
+cloudwatch = boto3.client("cloudwatch")
+
+METRIC_NAMESPACE = "CloudMart/Operations"
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
+
+
+def publish_metric(metric_name):
+    cloudwatch.put_metric_data(
+        Namespace=METRIC_NAMESPACE,
+        MetricData=[
+            {
+                "MetricName": metric_name,
+                "Dimensions": [
+                    {
+                        "Name": "Environment",
+                        "Value": ENVIRONMENT
+                    }
+                ],
+                "Value": 1,
+                "Unit": "Count"
+            }
+        ]
+    )
 
 
 def get_db_connection():
@@ -191,6 +212,7 @@ def lambda_handler(event, context):
                     ]
                 )
                 print("EVENTBRIDGE EVENT SENT")
+                publish_metric("LowStockEvents")
 
             return response(
                 201,
@@ -302,6 +324,7 @@ def lambda_handler(event, context):
                         }
                     ]
                 )
+                publish_metric("LowStockEvents")
 
             return response(
                 200,

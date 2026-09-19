@@ -3,6 +3,29 @@ import os
 import boto3
 import pymysql
 
+cloudwatch = boto3.client("cloudwatch")
+
+METRIC_NAMESPACE = "CloudMart/Operations"
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
+
+
+def publish_metric(metric_name):
+    cloudwatch.put_metric_data(
+        Namespace=METRIC_NAMESPACE,
+        MetricData=[
+            {
+                "MetricName": metric_name,
+                "Dimensions": [
+                    {
+                        "Name": "Environment",
+                        "Value": ENVIRONMENT
+                    }
+                ],
+                "Value": 1,
+                "Unit": "Count"
+            }
+        ]
+    )
 
 lambda_client = boto3.client("lambda")
 events_client = boto3.client("events")
@@ -197,6 +220,7 @@ def lambda_handler(event, context):
                     "error": str(event_error),
                     "order_id": order_id
                 }))
+            publish_metric("OrdersPlaced")
 
             return response(
                 201,
