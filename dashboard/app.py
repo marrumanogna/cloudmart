@@ -4,49 +4,91 @@ import boto3
 
 from flask import Flask, render_template, request, redirect, url_for
 
+
 app = Flask(__name__)
+
 
 AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 REPORTS_BUCKET = os.environ["REPORTS_BUCKET"]
 
-ssm = boto3.client("ssm", region_name=AWS_REGION)
-s3 = boto3.client("s3", region_name=AWS_REGION)
 
+ssm = boto3.client(
+    "ssm",
+    region_name=AWS_REGION
+)
+
+s3 = boto3.client(
+    "s3",
+    region_name=AWS_REGION
+)
+
+# ============================================================
+# SSM PARAMETER
+# ============================================================
 
 def get_parameter(name):
+
     response = ssm.get_parameter(
         Name=name,
         WithDecryption=True
     )
+
     return response["Parameter"]["Value"]
 
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
 
 def get_db_connection():
+
     return pymysql.connect(
         host=os.environ["DB_HOST"],
         port=int(os.environ.get("DB_PORT", "3306")),
-        user=get_parameter(os.environ["DB_USERNAME_PARAMETER"]),
-        password=get_parameter(os.environ["DB_PASSWORD_PARAMETER"]),
-        database=os.environ.get("DB_NAME", "cloudmart"),
+        user=get_parameter(
+            os.environ["DB_USERNAME_PARAMETER"]
+        ),
+        password=get_parameter(
+            os.environ["DB_PASSWORD_PARAMETER"]
+        ),
+        database=os.environ.get(
+            "DB_NAME",
+            "cloudmart"
+        ),
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=True
     )
 
 
+# ============================================================
+# DATABASE QUERY HELPER
+# ============================================================
+
 def query_db(sql, params=None):
+
     connection = None
 
     try:
+
         connection = get_db_connection()
 
         with connection.cursor() as cursor:
-            cursor.execute(sql, params or ())
+
+            cursor.execute(
+                sql,
+                params or ()
+            )
+
             return cursor.fetchall()
 
     finally:
+
         if connection:
             connection.close()
 
+
+# ============================================================
+# DASHBOARD
+# ============================================================
 
 @app.route("/")
 def dashboard():
@@ -150,10 +192,17 @@ def dashboard():
     )
 
 
+# ============================================================
+# PRODUCTS
+# ============================================================
+
 @app.route("/products")
 def products():
 
-    search = request.args.get("search", "").strip()
+    search = request.args.get(
+        "search",
+        ""
+    ).strip()
 
     if search:
 
@@ -194,6 +243,10 @@ def products():
     )
 
 
+# ============================================================
+# CUSTOMERS
+# ============================================================
+
 @app.route("/customers")
 def customers():
 
@@ -205,13 +258,16 @@ def customers():
             c.email,
             c.created_at,
             COUNT(o.order_id) AS total_orders,
-            COALESCE(SUM(
-                CASE
-                    WHEN o.status = 'CONFIRMED'
-                    THEN o.total_amount
-                    ELSE 0
-                END
-            ), 0) AS total_spent
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN o.status = 'CONFIRMED'
+                        THEN o.total_amount
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS total_spent
         FROM customers c
         LEFT JOIN orders o
             ON c.customer_id = o.customer_id
@@ -230,6 +286,10 @@ def customers():
     )
 
 
+# ============================================================
+# CUSTOMER DETAILS
+# ============================================================
+
 @app.route("/customers/<int:customer_id>")
 def customer_details(customer_id):
 
@@ -243,6 +303,7 @@ def customer_details(customer_id):
     )
 
     if not customer:
+
         return render_template(
             "error.html",
             error="Customer not found"
@@ -269,6 +330,10 @@ def customer_details(customer_id):
         orders=orders
     )
 
+
+# ============================================================
+# ORDERS
+# ============================================================
 
 @app.route("/orders")
 def orders():
@@ -297,6 +362,10 @@ def orders():
     )
 
 
+# ============================================================
+# ORDER DETAILS
+# ============================================================
+
 @app.route("/orders/<int:order_id>")
 def order_details(order_id):
 
@@ -315,6 +384,7 @@ def order_details(order_id):
     )
 
     if not order:
+
         return render_template(
             "error.html",
             error="Order not found"
@@ -345,6 +415,10 @@ def order_details(order_id):
     )
 
 
+# ============================================================
+# ORDER ITEMS
+# ============================================================
+
 @app.route("/order-items")
 def order_items():
 
@@ -371,6 +445,10 @@ def order_items():
     )
 
 
+# ============================================================
+# HISTORY
+# ============================================================
+
 @app.route("/history")
 def history():
 
@@ -394,6 +472,10 @@ def history():
     )
 
 
+# ============================================================
+# REPORTS
+# ============================================================
+
 @app.route("/reports")
 def reports():
 
@@ -402,20 +484,99 @@ def reports():
         Prefix="reports/"
     )
 
-    reports = response.get("Contents", [])
+    reports = response.get(
+        "Contents",
+        []
+    )
 
     reports.sort(
         key=lambda x: x["LastModified"],
         reverse=True
     )
 
+    latest_report = (
+        reports[0]
+        if reports
+        else None
+    )
+
     return render_template(
         "reports.html",
-        reports=reports
+        reports=reports,
+        latest_report=latest_report
     )
+
+
+# ============================================================
+# VIEW REPORT
+# ============================================================
+
+@app.route("/reports/view")
+def view_report():
+
+    key = request.args.get("key")
+
+    if not key or not key.startswith("reports/"):
+
+        return "Invalid report", 400
+
+    url = s3.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": REPORTS_BUCKET,
+            "Key": key,
+            "ResponseContentType": "text/csv",
+            "ResponseContentDisposition": "inline"
+        },
+        ExpiresIn=300
+    )
+
+    return redirect(url)
+
+
+# ============================================================
+# DOWNLOAD REPORT
+# ============================================================
+
+@app.route("/reports/download")
+def download_report():
+
+    key = request.args.get("key")
+
+    if not key or not key.startswith("reports/"):
+
+        return "Invalid report", 400
+
+    filename = key.split("/")[-1]
+
+    url = s3.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": REPORTS_BUCKET,
+            "Key": key,
+            "ResponseContentType": "text/csv",
+            "ResponseContentDisposition": (
+                f'attachment; filename="{filename}"'
+            )
+        },
+        ExpiresIn=300
+    )
+
+    return redirect(url)
+
+# ============================================================
+# LOGOUT
+# ============================================================
+
 @app.route("/logout")
 def logout():
-    return redirect(url_for("dashboard"))
+
+    return redirect(
+        url_for("dashboard")
+    )
+# ============================================================
+# ERROR HANDLER
+# ============================================================
 
 @app.errorhandler(Exception)
 def handle_error(error):
@@ -424,16 +585,26 @@ def handle_error(error):
         "error.html",
         error=str(error)
     ), 500
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
 @app.route("/health")
 def health():
+
     return {
         "status": "ok",
         "service": "cloudmart-dashboard"
     }, 200
+# ============================================================
+# LOCAL RUN
+# ============================================================
 
 if __name__ == "__main__":
+
     app.run(
         host="0.0.0.0",
         port=5000,
         debug=False
     )
+
