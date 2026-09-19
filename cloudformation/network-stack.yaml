@@ -595,7 +595,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
-          DestinationPrefixListId: !GetAtt S3VpcEndpoint.PrefixListId
+          DestinationPrefixListId: pl-78a54011
       Tags:
         - Key: Name
           Value: !Sub sg-lambda-${Environment}
