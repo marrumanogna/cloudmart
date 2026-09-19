@@ -512,7 +512,6 @@ def reports():
 # ============================================================
 # VIEW REPORT
 # ============================================================
-
 @app.route("/reports/view")
 def view_report():
     key = request.args.get("key", "")

@@ -261,7 +261,7 @@ Resources:
   # DASHBOARD EC2
   # ============================================================
 
-  DashboardInstanceV6:
+  DashboardInstanceV7:
     Type: AWS::EC2::Instance
 
     Properties:
@@ -592,7 +592,7 @@ Outputs:
   DashboardInstanceId:
     Description: CloudMart Dashboard EC2 Instance ID
 
-    Value: !Ref DashboardInstanceV6
+    Value: !Ref DashboardInstanceV7
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardInstanceId
@@ -605,7 +605,7 @@ Outputs:
   DashboardPublicIp:
     Description: CloudMart Dashboard Public IP
 
-    Value: !GetAtt DashboardInstanceV6.PublicIp
+    Value: !GetAtt DashboardInstanceV7.PublicIp
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardPublicIp
@@ -618,7 +618,7 @@ Outputs:
   DashboardUrl:
     Description: CloudMart Dashboard URL
 
-    Value: !Sub http://${DashboardInstanceV6.PublicIp}
+    Value: !Sub http://${DashboardInstanceV7.PublicIp}
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardUrl
