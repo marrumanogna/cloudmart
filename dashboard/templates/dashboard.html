@@ -25,7 +25,7 @@ Dashboard
 
     <div class="metric-card">
         <span>Total Revenue</span>
-        <strong>₹{{ "%.2f"|format(total_revenue|float) }}</strong>
+        <strong>{{ "%.2f"|format(total_revenue|float) }}</strong>
     </div>
 
     <div class="metric-card warning">
@@ -87,7 +87,7 @@ Dashboard
 
                     <td>{{ product.category }}</td>
 
-                    <td>₹{{ product.price }}</td>
+                    <td>{{ product.price }}</td>
 
                     <td>
                         <strong>{{ product.units_sold }}</strong>
@@ -199,7 +199,7 @@ Dashboard
                     </td>
 
                     <td>
-                        ₹{{ order.total_amount }}
+                        {{ order.total_amount }}
                     </td>
 
                     <td>
