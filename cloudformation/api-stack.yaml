@@ -764,6 +764,17 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
+          DB_HOST:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
+
+          DB_PORT:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
+
+          DB_NAME:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
+
+          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
+          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
           ORDER_PROCESSOR_FUNCTION: !Ref OrderProcessorLambda
           EVENT_BUS_NAME: !Ref CloudMartEventBus
 
