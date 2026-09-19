@@ -2,7 +2,8 @@ import json
 import os
 import boto3
 import pymysql
-
+ssm = boto3.client("ssm")
+events = boto3.client("events")
 cloudwatch = boto3.client("cloudwatch")
 
 METRIC_NAMESPACE = "CloudMart/Operations"
@@ -322,4 +323,76 @@ def lambda_handler(event, context):
                                 "stock_quantity": stock_count
                             })
                         }
-           
+                    ]
+                )
+                publish_metric("LowStockEvents")
+
+            return response(
+                200,
+                "Product updated successfully",
+                {"product_id": int(product_id)}
+            )
+
+        # =====================================================
+        # DELETE /products/{id}
+        # =====================================================
+        if method == "DELETE" and product_id:
+
+            with connection.cursor() as cursor:
+
+                cursor.execute("""
+                    SELECT product_id
+                    FROM products
+                    WHERE product_id = %s
+                    AND soft_delete IS NULL
+                """, (product_id,))
+
+                existing = cursor.fetchone()
+
+                if not existing:
+                    return response(
+                        404,
+                        "Product not found"
+                    )
+
+                cursor.execute("""
+                    UPDATE products
+                    SET soft_delete = CURRENT_TIMESTAMP
+                    WHERE product_id = %s
+                """, (product_id,))
+
+            connection.commit()
+
+            return response(
+                200,
+                "Product deleted successfully",
+                {"product_id": int(product_id)}
+            )
+
+        return response(
+            405,
+            "Method not supported"
+        )
+
+    except Exception as e:
+
+        print(json.dumps({
+            "level": "ERROR",
+            "message": "Product Lambda error",
+            "error": str(e),
+            "method": event.get("httpMethod"),
+            "path": event.get("path")
+        }))
+
+        if connection:
+            connection.rollback()
+
+        return response(
+            500,
+            "Internal server error"
+        )
+
+    finally:
+
+        if connection:
+            connection.close()

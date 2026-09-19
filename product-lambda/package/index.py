@@ -2,7 +2,8 @@ import json
 import os
 import boto3
 import pymysql
-
+ssm = boto3.client("ssm")
+events = boto3.client("events")
 cloudwatch = boto3.client("cloudwatch")
 
 METRIC_NAMESPACE = "CloudMart/Operations"
