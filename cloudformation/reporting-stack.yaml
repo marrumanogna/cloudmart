@@ -261,7 +261,7 @@ Resources:
   # DASHBOARD EC2
   # ============================================================
 
-  DashboardInstanceV5:
+  DashboardInstanceV6:
     Type: AWS::EC2::Instance
 
     Properties:
@@ -328,6 +328,8 @@ Resources:
           !Sub
             - |
               #!/bin/bash
+
+              echo "DASHBOARD_VERSION=reports-v2" >> /etc/cloudmart-dashboard.env
 
               set -euxo pipefail
 
@@ -590,7 +592,7 @@ Outputs:
   DashboardInstanceId:
     Description: CloudMart Dashboard EC2 Instance ID
 
-    Value: !Ref DashboardInstanceV5
+    Value: !Ref DashboardInstanceV6
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardInstanceId
@@ -603,7 +605,7 @@ Outputs:
   DashboardPublicIp:
     Description: CloudMart Dashboard Public IP
 
-    Value: !GetAtt DashboardInstanceV5.PublicIp
+    Value: !GetAtt DashboardInstanceV6.PublicIp
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardPublicIp
@@ -616,7 +618,7 @@ Outputs:
   DashboardUrl:
     Description: CloudMart Dashboard URL
 
-    Value: !Sub http://${DashboardInstanceV5.PublicIp}
+    Value: !Sub http://${DashboardInstanceV6.PublicIp}
 
     Export:
       Name: !Sub CloudMart-${Environment}-DashboardUrl
