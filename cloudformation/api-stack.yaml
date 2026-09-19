@@ -12,8 +12,8 @@ Parameters:
       - dev
       - prod
   NotificationEmail:
-    Type: String
-    Description: Email address for CloudMart SNS notifications
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: SSM parameter containing the CloudMart notification email
 
 Resources:
 
@@ -624,7 +624,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Ref NotificationEmail
+      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
       TopicArn: !Ref OrderFailedTopic
 
   OrderFailedRule:
