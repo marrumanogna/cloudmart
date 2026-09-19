@@ -265,7 +265,28 @@ Resources:
         Version: '2012-10-17'
         
         Statement:
-
+          - Sid: CloudWatchMonitoringDeployment
+            Effect: Allow
+            Action:
+              - cloudwatch:PutMetricAlarm
+              - cloudwatch:DeleteAlarms
+              - cloudwatch:DescribeAlarms
+              - cloudwatch:PutDashboard
+              - cloudwatch:DeleteDashboards
+              - cloudwatch:GetDashboard
+              - cloudwatch:ListDashboards
+            Resource: "*"
+          - Sid: SNSMonitoringDeployment
+            Effect: Allow
+            Action:
+              - sns:CreateTopic
+              - sns:DeleteTopic
+              - sns:GetTopicAttributes
+              - sns:SetTopicAttributes
+              - sns:Subscribe
+              - sns:Unsubscribe
+              - sns:ListSubscriptionsByTopic
+            Resource: "*"
           - Sid: CloudFormationDeployment
             Effect: Allow
             Action:

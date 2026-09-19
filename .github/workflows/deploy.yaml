@@ -393,6 +393,30 @@ jobs:
           echo "DASHBOARD_INSTANCE_ID=$DASHBOARD_INSTANCE_ID" >> "$GITHUB_ENV"
 
       # --------------------------------------------------------
+      # Recover Failed Monitoring Stack
+      # --------------------------------------------------------
+
+      - name: Recover Failed Monitoring Stack
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].StackStatus" \
+            --output text \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || true)
+
+          if [ "$STATUS" = "ROLLBACK_FAILED" ]; then
+            echo "Monitoring stack is ROLLBACK_FAILED. Deleting it so CloudFormation can recreate it."
+
+            aws cloudformation delete-stack \
+              --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+              --region ${{ env.AWS_REGION }}
+
+            aws cloudformation wait stack-delete-complete \
+              --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+              --region ${{ env.AWS_REGION }}
+          fi
+
+      # --------------------------------------------------------
       # Deploy Monitoring Stack
       # --------------------------------------------------------
 
@@ -408,7 +432,6 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }} \
             --no-fail-on-empty-changeset
-
       # --------------------------------------------------------
       # Show Monitoring Dashboard
       # --------------------------------------------------------
