@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block page_title %}Report{% endblock %}
+
+{% block content %}
+
+<div class="section">
+
+    <div class="section-header">
+        <div>
+            <h2>{{ report_name }}</h2>
+            <p>CloudMart Daily Sales Report</p>
+        </div>
+
+        <a
+            href="{{ url_for('download_report', key='reports/' + report_name) }}"
+            class="report-btn download-btn"
+        >
+            Download CSV
+        </a>
+    </div>
+
+    <div class="table-container">
+
+        {% if rows %}
+
+        <table>
+
+            <thead>
+                <tr>
+                    {% for column in columns %}
+                    <th>{{ column }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for row in rows %}
+                <tr>
+
+                    {% for column in columns %}
+                    <td>{{ row[column] }}</td>
+                    {% endfor %}
+
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+        {% else %}
+
+        <div class="empty-state">
+            This report contains no records.
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,6 +1,8 @@
 import os
 import pymysql
 import boto3
+import csv
+import io
 
 from flask import Flask, render_template, request, redirect, url_for
 
@@ -513,25 +515,31 @@ def reports():
 
 @app.route("/reports/view")
 def view_report():
-
-    key = request.args.get("key")
+    key = request.args.get("key", "")
 
     if not key or not key.startswith("reports/"):
-
         return "Invalid report", 400
 
-    url = s3.generate_presigned_url(
-        "get_object",
-        Params={
-            "Bucket": REPORTS_BUCKET,
-            "Key": key,
-            "ResponseContentType": "text/csv",
-            "ResponseContentDisposition": "inline"
-        },
-        ExpiresIn=300
-    )
+    try:
+        response = s3.get_object(
+            Bucket=REPORTS_BUCKET,
+            Key=key
+        )
 
-    return redirect(url)
+        csv_content = response["Body"].read().decode("utf-8")
+
+        reader = csv.DictReader(io.StringIO(csv_content))
+        rows = list(reader)
+
+        return render_template(
+            "report_view.html",
+            report_name=key.split("/")[-1],
+            columns=reader.fieldnames or [],
+            rows=rows
+        )
+
+    except Exception as error:
+        return render_template("error.html", error=str(error)), 500
 
 
 # ============================================================
