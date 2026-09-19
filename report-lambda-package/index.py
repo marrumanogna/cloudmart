@@ -4,49 +4,92 @@ import json
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
 import boto3
 import pymysql
+from botocore.config import Config
+
+# ------------------------------------------------------------
+# AWS CLIENTS
+# ------------------------------------------------------------
+
+aws_config = Config(
+    connect_timeout=5,
+    read_timeout=5,
+    retries={"max_attempts": 1}
+)
+
+ssm = boto3.client("ssm", config=aws_config)
+s3 = boto3.client("s3", config=aws_config)
 
 
-ssm = boto3.client("ssm")
-s3 = boto3.client("s3")
-
+# ------------------------------------------------------------
+# SSM PARAMETER
+# ------------------------------------------------------------
 
 def get_parameter(name):
+    print(f"REPORT: Calling SSM get_parameter for {name}")
+
     response = ssm.get_parameter(
         Name=name,
         WithDecryption=True
     )
 
+    print(f"REPORT: SSM get_parameter succeeded for {name}")
+
     return response["Parameter"]["Value"]
 
 
+# ------------------------------------------------------------
+# DATABASE CONNECTION
+# ------------------------------------------------------------
+
 def get_db_connection():
+
+    print("REPORT: Fetching DB username from SSM")
+
     username = get_parameter(
         os.environ["DB_USERNAME_PARAMETER"]
     )
+
+    print("REPORT: DB username fetched from SSM")
+
+    print("REPORT: Fetching DB password from SSM")
 
     password = get_parameter(
         os.environ["DB_PASSWORD_PARAMETER"]
     )
 
-    return pymysql.connect(
+    print("REPORT: DB password fetched from SSM")
+
+    print("REPORT: Connecting to RDS")
+
+    connection = pymysql.connect(
         host=os.environ["DB_HOST"],
         port=int(os.environ["DB_PORT"]),
         user=username,
         password=password,
         database=os.environ["DB_NAME"],
-        connect_timeout=10,
+        connect_timeout=5,
+        read_timeout=5,
+        write_timeout=5,
         cursorclass=pymysql.cursors.DictCursor
     )
 
+    print("REPORT: Connected to RDS successfully")
+
+    return connection
+
+
+# ------------------------------------------------------------
+# LAMBDA HANDLER
+# ------------------------------------------------------------
 
 def lambda_handler(event, context):
 
     connection = None
 
     try:
+
         # Use India time so "today" matches the dashboard/report date.
         report_date = datetime.now(
             ZoneInfo("Asia/Kolkata")
@@ -58,7 +101,21 @@ def lambda_handler(event, context):
             "report_date": str(report_date)
         }))
 
+        # ----------------------------------------------------
+        # DATABASE CONNECTION
+        # ----------------------------------------------------
+
         connection = get_db_connection()
+
+        print("REPORT: Database connection established")
+
+        # ----------------------------------------------------
+        # QUERY ORDERS
+        # ----------------------------------------------------
+
+        print(
+            f"REPORT: Fetching orders for {report_date}"
+        )
 
         with connection.cursor() as cursor:
 
@@ -93,7 +150,17 @@ def lambda_handler(event, context):
 
             rows = cursor.fetchall()
 
-        # Create CSV in memory.
+        print(
+            f"REPORT: Database query completed. "
+            f"Rows returned: {len(rows)}"
+        )
+
+        # ----------------------------------------------------
+        # CREATE CSV
+        # ----------------------------------------------------
+
+        print("REPORT: Creating CSV in memory")
+
         csv_buffer = io.StringIO()
 
         fieldnames = [
@@ -115,6 +182,7 @@ def lambda_handler(event, context):
         writer.writeheader()
 
         for row in rows:
+
             writer.writerow({
                 "order_id": row["order_id"],
                 "customer_id": row["customer_id"],
@@ -126,11 +194,22 @@ def lambda_handler(event, context):
                 "total_quantity": row["total_quantity"]
             })
 
+        print("REPORT: CSV created successfully")
+
+        # ----------------------------------------------------
+        # UPLOAD CSV TO S3
+        # ----------------------------------------------------
+
         bucket = os.environ["REPORTS_BUCKET"]
 
         key = (
             f"reports/daily_report_"
             f"{report_date.isoformat()}.csv"
+        )
+
+        print(
+            f"REPORT: Uploading CSV to S3. "
+            f"Bucket={bucket}, Key={key}"
         )
 
         s3.put_object(
@@ -139,6 +218,12 @@ def lambda_handler(event, context):
             Body=csv_buffer.getvalue().encode("utf-8"),
             ContentType="text/csv"
         )
+
+        print("REPORT: CSV uploaded to S3 successfully")
+
+        # ----------------------------------------------------
+        # SUCCESS
+        # ----------------------------------------------------
 
         print(json.dumps({
             "level": "INFO",
@@ -172,4 +257,8 @@ def lambda_handler(event, context):
     finally:
 
         if connection:
+
+            print("REPORT: Closing database connection")
+
             connection.close()
+
