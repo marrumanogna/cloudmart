@@ -592,6 +592,10 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 10.0.0.0/16
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          DestinationPrefixListId: !GetAtt S3VpcEndpoint.PrefixListId
       Tags:
         - Key: Name
           Value: !Sub sg-lambda-${Environment}
