@@ -88,7 +88,6 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
-
 def lambda_handler(event, context):
 
     try:

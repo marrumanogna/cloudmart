@@ -69,6 +69,25 @@ Resources:
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmNotificationTopic
+  OrdersPlacedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub CloudMart-${Environment}-OrdersPlaced
+      AlarmDescription: Alarm when an order is successfully placed
+      Namespace: CloudMart/Operations
+      MetricName: OrdersPlaced
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmNotificationTopic
 
   DashboardCpuAlarm:
     Type: AWS::CloudWatch::Alarm
