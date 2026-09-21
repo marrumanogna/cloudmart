@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CloudMart Admin Login</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+<body>
+
+<div class="login-container">
+
+    <div class="login-card">
+
+        <div class="login-logo">
+            C
+        </div>
+
+        <h1>CloudMart</h1>
+
+        <p class="login-subtitle">
+            Admin Console
+        </p>
+
+        <form method="POST">
+
+            <label for="admin_token">
+                Admin Token
+            </label>
+
+            <input
+                type="password"
+                id="admin_token"
+                name="admin_token"
+                placeholder="Enter Admin Token"
+                required
+            >
+
+            {% if error %}
+
+            <div class="login-error">
+                {{ error }}
+            </div>
+
+            {% endif %}
+
+            <button type="submit">
+                Login
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -218,6 +218,8 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/admin-token
+
 
   # ============================================================
   # EC2 INSTANCE PROFILE
@@ -445,6 +447,10 @@ Resources:
               # ENVIRONMENT VARIABLES
               # ==================================================
 
+               set +x
+
+              FLASK_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+
               cat > /etc/cloudmart-dashboard.env <<EOF
               AWS_REGION=${AWS::Region}
               REPORTS_BUCKET=${ReportsBucket}
@@ -453,11 +459,15 @@ Resources:
               DB_NAME=${DbName}
               DB_USERNAME_PARAMETER=/cloudmart/${Environment}/rds/username
               DB_PASSWORD_PARAMETER=/cloudmart/${Environment}/rds/password
+              ADMIN_TOKEN_PARAMETER=/cloudmart/${Environment}/auth/admin-token
+              FLASK_SECRET_KEY=$FLASK_SECRET_KEY
               EOF
 
+              unset FLASK_SECRET_KEY
+
+              set -x
 
               chmod 600 /etc/cloudmart-dashboard.env
-
 
               # ==================================================
               # GUNICORN SYSTEMD SERVICE

@@ -4,14 +4,19 @@ import boto3
 import csv
 import io
 
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
+from functools import wraps
+import hmac
 
 
 app = Flask(__name__)
 
+app.config["SECRET_KEY"] = os.environ["FLASK_SECRET_KEY"]
+
 
 AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 REPORTS_BUCKET = os.environ["REPORTS_BUCKET"]
+ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
 
 
 ssm = boto3.client(
@@ -36,7 +41,78 @@ def get_parameter(name):
     )
 
     return response["Parameter"]["Value"]
+# ============================================================
+# ADMIN AUTHENTICATION
+# ============================================================
 
+@app.before_request
+def require_admin_login():
+
+    allowed_endpoints = {
+        "login",
+        "health",
+        "static"
+    }
+
+    if request.endpoint in allowed_endpoints:
+        return
+
+    if not session.get("admin_authenticated"):
+        return redirect(
+            url_for(
+                "login",
+                next=request.url
+            )
+        )
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+
+    if session.get("admin_authenticated"):
+        return redirect(url_for("dashboard"))
+
+    error = None
+
+    if request.method == "POST":
+
+        entered_token = request.form.get(
+            "admin_token",
+            ""
+        ).strip()
+
+        try:
+
+            stored_token = get_parameter(
+                ADMIN_TOKEN_PARAMETER
+            )
+
+            if hmac.compare_digest(
+                entered_token,
+                stored_token
+            ):
+
+                session["admin_authenticated"] = True
+
+                next_url = request.args.get("next")
+
+                if next_url and next_url.startswith("/"):
+                    return redirect(next_url)
+
+                return redirect(
+                    url_for("dashboard")
+                )
+
+            error = "Invalid Admin Token"
+
+        except Exception:
+
+            error = "Unable to validate Admin Token"
+
+    return render_template(
+        "login.html",
+        error=error
+    )
 # ============================================================
 # DATABASE CONNECTION
 # ============================================================
@@ -578,8 +654,10 @@ def download_report():
 @app.route("/logout")
 def logout():
 
+    session.clear()
+
     return redirect(
-        url_for("dashboard")
+        url_for("login")
     )
 # ============================================================
 # ERROR HANDLER
