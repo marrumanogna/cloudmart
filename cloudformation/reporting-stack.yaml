@@ -20,23 +20,11 @@ Parameters:
   LatestAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
-
-
 # ============================================================
 # RESOURCES
 # ============================================================
 
 Resources:
-
-  DefaultEc2InstanceManagementRole:
-    Type: AWS::SSM::ServiceSetting
-    DependsOn:
-      - DashboardEc2Role
-
-    Properties:
-      SettingId: /ssm/managed-instance/default-ec2-instance-management-role
-      SettingValue: !Ref DashboardEc2Role
-
 
   # ============================================================
   # DAILY REPORT SCHEDULE
@@ -603,7 +591,7 @@ Resources:
   # AUTOMATIC DASHBOARD DEPLOYMENT
   # ============================================================
 
-  DashboardDeploymentAssociation:
+  DashboardDeploymentAssociationV2:
     Type: AWS::SSM::Association
 
     DependsOn:
@@ -612,8 +600,10 @@ Resources:
     Properties:
 
       Name: AWS-RunShellScript
-
-      InstanceId: !Ref DashboardInstanceV9
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DashboardInstanceV9
 
       ApplyOnlyAtCronInterval: false
 
