@@ -12,7 +12,7 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-  
+
   DashboardVersion:
     Type: String
     Default: initial
@@ -27,13 +27,16 @@ Parameters:
 # ============================================================
 
 Resources:
+
   DefaultEc2InstanceManagementRole:
     Type: AWS::SSM::ServiceSetting
     DependsOn:
       - DashboardEc2Role
+
     Properties:
       SettingId: /ssm/managed-instance/default-ec2-instance-management-role
       SettingValue: !Ref DashboardEc2Role
+
 
   # ============================================================
   # DAILY REPORT SCHEDULE
@@ -119,7 +122,6 @@ Resources:
 
       Policies:
 
-
         # ------------------------------------------------------
         # Upload bootstrap log to S3
         # ------------------------------------------------------
@@ -204,7 +206,7 @@ Resources:
 
 
         # ------------------------------------------------------
-        # Read RDS credentials from SSM Parameter Store
+        # Read RDS credentials and Admin Token from SSM
         # ------------------------------------------------------
 
         - PolicyName: DashboardSSMRead
@@ -335,8 +337,6 @@ Resources:
             - |
               #!/bin/bash
 
-              echo "DASHBOARD_VERSION=${DashboardVersion}" >> /etc/cloudmart-dashboard.env
-
               set -euxo pipefail
 
               LOG_FILE=/var/log/cloudmart-dashboard-setup.log
@@ -400,8 +400,10 @@ Resources:
 
               done
 
+
               # Fail if credentials never became available
               aws sts get-caller-identity
+
 
               # ==================================================
               # DOWNLOAD DASHBOARD PACKAGE
@@ -412,6 +414,7 @@ Resources:
               aws s3 cp \
                 "s3://${ArtifactsBucket}/dashboard/cloudmart-dashboard.zip" \
                 /tmp/cloudmart-dashboard.zip
+
 
               # ==================================================
               # EXTRACT DASHBOARD
@@ -451,7 +454,7 @@ Resources:
               # ENVIRONMENT VARIABLES
               # ==================================================
 
-               set +x
+              set +x
 
               FLASK_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
 
@@ -465,6 +468,7 @@ Resources:
               DB_PASSWORD_PARAMETER=/cloudmart/${Environment}/rds/password
               ADMIN_TOKEN_PARAMETER=/cloudmart/${Environment}/auth/admin-token
               FLASK_SECRET_KEY=$FLASK_SECRET_KEY
+              DASHBOARD_VERSION=${DashboardVersion}
               EOF
 
               unset FLASK_SECRET_KEY
@@ -472,6 +476,7 @@ Resources:
               set -x
 
               chmod 600 /etc/cloudmart-dashboard.env
+
 
               # ==================================================
               # GUNICORN SYSTEMD SERVICE
@@ -590,7 +595,181 @@ Resources:
 
               DbName:
                 Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
-              
+
+              DashboardVersion: !Ref DashboardVersion
+
+
+  # ============================================================
+  # AUTOMATIC DASHBOARD DEPLOYMENT
+  # ============================================================
+
+  DashboardDeploymentAssociation:
+    Type: AWS::SSM::Association
+
+    DependsOn:
+      - DashboardInstanceV9
+
+    Properties:
+
+      Name: AWS-RunShellScript
+
+      InstanceId: !Ref DashboardInstanceV9
+
+      ApplyOnlyAtCronInterval: false
+
+      WaitForSuccessTimeoutSeconds: 600
+
+      Parameters:
+
+        commands:
+          - !Sub
+            - |
+              #!/bin/bash
+
+              set -e
+
+              echo "===== CloudMart Dashboard Deployment Started ====="
+
+              echo "Waiting for initial EC2 bootstrap..."
+
+              if command -v cloud-init >/dev/null 2>&1; then
+                cloud-init status --wait || true
+              fi
+
+
+              echo "Deploying dashboard version: ${DashboardVersion}"
+
+
+              # ==================================================
+              # STOP DASHBOARD
+              # ==================================================
+
+              systemctl stop cloudmart-dashboard || true
+
+
+              # ==================================================
+              # DOWNLOAD LATEST DASHBOARD ZIP
+              # ==================================================
+
+              rm -f /tmp/cloudmart-dashboard.zip
+
+              aws s3 cp \
+                "s3://${ArtifactsBucket}/dashboard/cloudmart-dashboard.zip" \
+                /tmp/cloudmart-dashboard.zip
+
+
+              # ==================================================
+              # EXTRACT NEW DASHBOARD
+              # ==================================================
+
+              rm -rf /opt/cloudmart-dashboard/*
+
+              unzip -o \
+                /tmp/cloudmart-dashboard.zip \
+                -d /opt/cloudmart-dashboard
+
+
+              # ==================================================
+              # CREATE / UPDATE PYTHON ENVIRONMENT
+              # ==================================================
+
+              python3 -m venv /opt/cloudmart-dashboard/venv
+
+
+              /opt/cloudmart-dashboard/venv/bin/pip install \
+                --upgrade pip
+
+
+              /opt/cloudmart-dashboard/venv/bin/pip install \
+                -r /opt/cloudmart-dashboard/requirements.txt
+
+
+              # ==================================================
+              # PRESERVE EXISTING FLASK SECRET
+              # ==================================================
+
+              FLASK_SECRET_KEY=$(grep '^FLASK_SECRET_KEY=' \
+                /etc/cloudmart-dashboard.env 2>/dev/null \
+                | cut -d= -f2- || true)
+
+
+              if [ -z "$FLASK_SECRET_KEY" ]; then
+
+                FLASK_SECRET_KEY=$(
+                  python3 -c 'import secrets; print(secrets.token_hex(32))'
+                )
+
+              fi
+
+
+              # ==================================================
+              # WRITE DASHBOARD ENVIRONMENT
+              # ==================================================
+
+              cat > /etc/cloudmart-dashboard.env <<EOF
+              AWS_REGION=${AWS::Region}
+              REPORTS_BUCKET=${ReportsBucket}
+              DB_HOST=${RdsEndpoint}
+              DB_PORT=${RdsPort}
+              DB_NAME=${DbName}
+              DB_USERNAME_PARAMETER=/cloudmart/${Environment}/rds/username
+              DB_PASSWORD_PARAMETER=/cloudmart/${Environment}/rds/password
+              ADMIN_TOKEN_PARAMETER=/cloudmart/${Environment}/auth/admin-token
+              FLASK_SECRET_KEY=$FLASK_SECRET_KEY
+              DASHBOARD_VERSION=${DashboardVersion}
+              EOF
+
+
+              chmod 600 /etc/cloudmart-dashboard.env
+
+
+              # ==================================================
+              # SET OWNERSHIP
+              # ==================================================
+
+              chown -R ec2-user:ec2-user \
+                /opt/cloudmart-dashboard
+
+
+              # ==================================================
+              # START DASHBOARD
+              # ==================================================
+
+              systemctl daemon-reload
+
+              systemctl enable cloudmart-dashboard
+
+              systemctl restart cloudmart-dashboard
+
+
+              sleep 5
+
+
+              # ==================================================
+              # HEALTH CHECK
+              # ==================================================
+
+              curl -f http://127.0.0.1:8000/health
+
+
+              echo "===== CloudMart Dashboard Deployment Completed ====="
+
+
+            - ArtifactsBucket:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
+
+              ReportsBucket:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
+
+              RdsEndpoint:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
+
+              RdsPort:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
+
+              DbName:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
+
               DashboardVersion: !Ref DashboardVersion
 
 
