@@ -399,6 +399,7 @@ Resources:
               - ssm:ListTagsForResource
               - ssm:GetServiceSetting
               - ssm:UpdateServiceSetting
+              - ssm:ResetServiceSetting
             Resource: "*"
             
           - Sid: LambdaDeployment
