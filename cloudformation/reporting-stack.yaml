@@ -12,6 +12,10 @@ Parameters:
   Environment:
     Type: String
     Default: dev
+  
+  DashboardVersion:
+    Type: String
+    Default: initial
 
   LatestAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
@@ -331,7 +335,7 @@ Resources:
             - |
               #!/bin/bash
 
-              echo "DASHBOARD_VERSION=reports-v2" >> /etc/cloudmart-dashboard.env
+              echo "DASHBOARD_VERSION=${DashboardVersion}" >> /etc/cloudmart-dashboard.env
 
               set -euxo pipefail
 
@@ -586,6 +590,8 @@ Resources:
 
               DbName:
                 Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
+              
+              DashboardVersion: !Ref DashboardVersion
 
 
 # ============================================================

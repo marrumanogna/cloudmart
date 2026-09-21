@@ -354,6 +354,7 @@ jobs:
             --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
+              DashboardVersion=${{ github.sha }} \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }} \
             --no-fail-on-empty-changeset
