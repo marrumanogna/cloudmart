@@ -390,8 +390,13 @@ Resources:
               - ssm:GetParameter
               - ssm:GetParameters
               - ssm:DeleteParameter
+              - ssm:CreateAssociation
+              - ssm:UpdateAssociation
+              - ssm:DeleteAssociation
+              - ssm:DescribeAssociation
               - ssm:AddTagsToResource
               - ssm:RemoveTagsFromResource
+              - ssm:ListTagsForResource
               - ssm:GetServiceSetting
               - ssm:UpdateServiceSetting
             Resource: "*"
