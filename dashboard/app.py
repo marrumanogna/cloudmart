@@ -171,7 +171,7 @@ def get_pagination():
     if page < 1:
         page = 1
 
-    per_page = 100
+    per_page = 10
     offset = (page - 1) * per_page
 
     return page, per_page, offset
@@ -297,7 +297,7 @@ def products():
     if page < 1:
         page = 1
 
-    per_page = 100
+    per_page = 10
     offset = (page - 1) * per_page
 
     search_pattern = f"%{search}%"
@@ -368,7 +368,6 @@ def products():
     total_products = total_result[0]["total"]
 
     total_pages = max(1, (total_products + per_page - 1) // per_page)
-
     return render_template(
         "products.html",
         products=products,
@@ -498,6 +497,14 @@ def customers():
         1,
         (total_customers + per_page - 1) // per_page
     )
+    return render_template(
+    "customers.html",
+    customers=customers,
+    search=search,
+    page=page,
+    total_pages=total_pages
+)
+
 # ============================================================
 # CUSTOMER DETAILS
 # ============================================================
