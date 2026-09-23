@@ -3,7 +3,17 @@
 {% block content %}
 <div class="section">
 <div class="section-header">
-<h2>Products</h2>
+    <h2>Products</h2>
+
+    <form method="get" action="{{ url_for('products') }}" class="search-form">
+        <input
+            type="text"
+            name="search"
+            placeholder="Search products..."
+            value="{{ search }}"
+        >
+        <button type="submit">Search</button>
+    </form>
 </div>
 <div class="table-container">
 <table>
@@ -28,3 +38,22 @@
 </div>
 </div>
 {% endblock %}
+<div class="pagination">
+
+    {% if page > 1 %}
+        <a href="{{ url_for('products', page=page-1, search=search) }}">
+            Previous
+        </a>
+    {% endif %}
+
+    <span>
+        Page {{ page }} of {{ total_pages }}
+    </span>
+
+    {% if page < total_pages %}
+        <a href="{{ url_for('products', page=page+1, search=search) }}">
+            Next
+        </a>
+    {% endif %}
+
+</div>

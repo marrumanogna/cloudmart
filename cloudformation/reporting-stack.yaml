@@ -66,7 +66,6 @@ Resources:
 
       SourceArn: !GetAtt DailyReportSchedule.Arn
 
-
   # ============================================================
   # DASHBOARD EC2 IAM ROLE
   # ============================================================
@@ -354,20 +353,18 @@ Resources:
                 python3 \
                 python3-pip \
                 nginx \
-                unzip
-
+                unzip \
+                mariadb105
 
               # Amazon Linux 2023 includes AWS CLI v2
 
               aws --version
-
 
               # ==================================================
               # DASHBOARD DIRECTORY
               # ==================================================
 
               mkdir -p /opt/cloudmart-dashboard
-
 
               # ==================================================
               # WAIT FOR EC2 IAM CREDENTIALS
@@ -413,8 +410,7 @@ Resources:
               unzip -o \
                 /tmp/cloudmart-dashboard.zip \
                 -d /opt/cloudmart-dashboard
-
-
+                
               # ==================================================
               # CREATE PYTHON VIRTUAL ENVIRONMENT
               # ==================================================
@@ -638,7 +634,7 @@ Resources:
 
 
               # ==================================================
-              # DOWNLOAD LATEST DASHBOARD ZIP
+              # Delete & takes DASHBOARD ZIP from s3
               # ==================================================
 
               rm -f /tmp/cloudmart-dashboard.zip

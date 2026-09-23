@@ -3,13 +3,12 @@ import pymysql
 import boto3
 import csv
 import io
-
 from flask import Flask, render_template, request, redirect, url_for, session
 from functools import wraps
 import hmac
 
 
-app = Flask(__name__)
+app = Flask(__name__) # used to protect Flask sessions.
 
 app.config["SECRET_KEY"] = os.environ["FLASK_SECRET_KEY"]
 
@@ -162,6 +161,20 @@ def query_db(sql, params=None):
 
         if connection:
             connection.close()
+# ============================================================
+# PAGINATION
+# ============================================================
+
+def get_pagination():
+    page = request.args.get("page", 1, type=int)
+
+    if page < 1:
+        page = 1
+
+    per_page = 100
+    offset = (page - 1) * per_page
+
+    return page, per_page, offset
 
 
 # ============================================================
@@ -277,10 +290,17 @@ def dashboard():
 @app.route("/products")
 def products():
 
-    search = request.args.get(
-        "search",
-        ""
-    ).strip()
+    search = request.args.get("search", "").strip()
+
+    page = request.args.get("page", 1, type=int)
+
+    if page < 1:
+        page = 1
+
+    per_page = 100
+    offset = (page - 1) * per_page
+
+    search_pattern = f"%{search}%"
 
     if search:
 
@@ -289,17 +309,38 @@ def products():
             SELECT *
             FROM products
             WHERE soft_delete IS NULL
-            AND (
-                name LIKE %s
-                OR category LIKE %s
-                OR description LIKE %s
-            )
+              AND (
+                  name LIKE %s
+                  OR category LIKE %s
+                  OR description LIKE %s
+              )
             ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
             """,
             (
-                f"%{search}%",
-                f"%{search}%",
-                f"%{search}%"
+                search_pattern,
+                search_pattern,
+                search_pattern,
+                per_page,
+                offset
+            )
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM products
+            WHERE soft_delete IS NULL
+              AND (
+                  name LIKE %s
+                  OR category LIKE %s
+                  OR description LIKE %s
+              )
+            """,
+            (
+                search_pattern,
+                search_pattern,
+                search_pattern
             )
         )
 
@@ -311,15 +352,34 @@ def products():
             FROM products
             WHERE soft_delete IS NULL
             ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (per_page, offset)
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM products
+            WHERE soft_delete IS NULL
             """
         )
+
+    total_products = total_result[0]["total"]
+
+    total_pages = max(1, (total_products + per_page - 1) // per_page)
 
     return render_template(
         "products.html",
         products=products,
-        search=search
+        search=search,
+        page=page,
+        total_pages=total_pages
     )
 
+# ============================================================
+# CUSTOMERS
+# ============================================================
 
 # ============================================================
 # CUSTOMERS
@@ -328,41 +388,121 @@ def products():
 @app.route("/customers")
 def customers():
 
-    customers = query_db(
-        """
-        SELECT
-            c.customer_id,
-            c.name,
-            c.email,
-            c.created_at,
-            COUNT(o.order_id) AS total_orders,
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN o.status = 'CONFIRMED'
-                        THEN o.total_amount
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS total_spent
-        FROM customers c
-        LEFT JOIN orders o
-            ON c.customer_id = o.customer_id
-        GROUP BY
-            c.customer_id,
-            c.name,
-            c.email,
-            c.created_at
-        ORDER BY c.customer_id DESC
-        """
+    search = request.args.get("search", "").strip()
+
+    page, per_page, offset = get_pagination()
+
+    if search:
+
+        customers = query_db(
+            """
+            SELECT
+                c.customer_id,
+                c.name,
+                c.email,
+                c.created_at,
+                COUNT(o.order_id) AS total_orders,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN o.status = 'CONFIRMED'
+                            THEN o.total_amount
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS total_spent
+            FROM customers c
+            LEFT JOIN orders o
+                ON c.customer_id = o.customer_id
+            WHERE
+                c.name LIKE %s
+                OR c.email LIKE %s
+                OR CAST(c.customer_id AS CHAR) LIKE %s
+            GROUP BY
+                c.customer_id,
+                c.name,
+                c.email,
+                c.created_at
+            ORDER BY c.customer_id DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                per_page,
+                offset
+            )
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM customers
+            WHERE
+                name LIKE %s
+                OR email LIKE %s
+                OR CAST(customer_id AS CHAR) LIKE %s
+            """,
+            (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%"
+            )
+        )
+
+    else:
+
+        customers = query_db(
+            """
+            SELECT
+                c.customer_id,
+                c.name,
+                c.email,
+                c.created_at,
+                COUNT(o.order_id) AS total_orders,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN o.status = 'CONFIRMED'
+                            THEN o.total_amount
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS total_spent
+            FROM customers c
+            LEFT JOIN orders o
+                ON c.customer_id = o.customer_id
+            GROUP BY
+                c.customer_id,
+                c.name,
+                c.email,
+                c.created_at
+            ORDER BY c.customer_id DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                per_page,
+                offset
+            )
+        )
+
+    total_customers = total_result[0]["total"]
+
+    total_pages = max(
+        1,
+        (total_customers + per_page - 1) // per_page
     )
 
     return render_template(
         "customers.html",
-        customers=customers
+        customers=customers,
+        search=search,
+        page=page,
+        total_pages=total_pages
     )
-
 
 # ============================================================
 # CUSTOMER DETAILS
@@ -416,27 +556,113 @@ def customer_details(customer_id):
 @app.route("/orders")
 def orders():
 
-    orders = query_db(
-        """
-        SELECT
-            o.order_id,
-            o.customer_id,
-            c.name AS customer_name,
-            c.email AS customer_email,
-            o.status,
-            o.total_amount,
-            o.created_at,
-            o.updated_at
-        FROM orders o
-        JOIN customers c
-            ON o.customer_id = c.customer_id
-        ORDER BY o.created_at DESC
-        """
+    search = request.args.get("search", "").strip()
+
+    page, per_page, offset = get_pagination()
+
+    if search:
+
+        orders = query_db(
+            """
+            SELECT
+                o.order_id,
+                o.customer_id,
+                c.name AS customer_name,
+                c.email AS customer_email,
+                o.status,
+                o.total_amount,
+                o.created_at,
+                o.updated_at
+            FROM orders o
+            JOIN customers c
+                ON o.customer_id = c.customer_id
+            WHERE
+                CAST(o.order_id AS CHAR) LIKE %s
+                OR CAST(o.customer_id AS CHAR) LIKE %s
+                OR c.name LIKE %s
+                OR c.email LIKE %s
+                OR o.status LIKE %s
+            ORDER BY o.created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                per_page,
+                offset
+            )
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM orders o
+            JOIN customers c
+                ON o.customer_id = c.customer_id
+            WHERE
+                CAST(o.order_id AS CHAR) LIKE %s
+                OR CAST(o.customer_id AS CHAR) LIKE %s
+                OR c.name LIKE %s
+                OR c.email LIKE %s
+                OR o.status LIKE %s
+            """,
+            (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%"
+            )
+        )
+
+    else:
+
+        orders = query_db(
+            """
+            SELECT
+                o.order_id,
+                o.customer_id,
+                c.name AS customer_name,
+                c.email AS customer_email,
+                o.status,
+                o.total_amount,
+                o.created_at,
+                o.updated_at
+            FROM orders o
+            JOIN customers c
+                ON o.customer_id = c.customer_id
+            ORDER BY o.created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                per_page,
+                offset
+            )
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM orders
+            """
+        )
+
+    total_orders = total_result[0]["total"]
+
+    total_pages = max(
+        1,
+        (total_orders + per_page - 1) // per_page
     )
 
     return render_template(
         "orders.html",
-        orders=orders
+        orders=orders,
+        search=search,
+        page=page,
+        total_pages=total_pages
     )
 
 
@@ -500,56 +726,212 @@ def order_details(order_id):
 @app.route("/order-items")
 def order_items():
 
-    items = query_db(
-        """
-        SELECT
-            oi.order_item_id,
-            oi.order_id,
-            oi.product_id,
-            p.name AS product_name,
-            oi.quantity,
-            oi.unit_price,
-            (oi.quantity * oi.unit_price) AS item_total
-        FROM order_items oi
-        JOIN products p
-            ON oi.product_id = p.product_id
-        ORDER BY oi.order_id DESC
-        """
+    search = request.args.get("search", "").strip()
+
+    page, per_page, offset = get_pagination()
+
+    if search:
+
+        items = query_db(
+            """
+            SELECT
+                oi.order_item_id,
+                oi.order_id,
+                oi.product_id,
+                p.name AS product_name,
+                oi.quantity,
+                oi.unit_price,
+                (oi.quantity * oi.unit_price) AS item_total
+            FROM order_items oi
+            JOIN products p
+                ON oi.product_id = p.product_id
+            WHERE
+                CAST(oi.order_item_id AS CHAR) LIKE %s
+                OR CAST(oi.order_id AS CHAR) LIKE %s
+                OR CAST(oi.product_id AS CHAR) LIKE %s
+                OR p.name LIKE %s
+            ORDER BY oi.order_id DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                per_page,
+                offset
+            )
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM order_items oi
+            JOIN products p
+                ON oi.product_id = p.product_id
+            WHERE
+                CAST(oi.order_item_id AS CHAR) LIKE %s
+                OR CAST(oi.order_id AS CHAR) LIKE %s
+                OR CAST(oi.product_id AS CHAR) LIKE %s
+                OR p.name LIKE %s
+            """,
+            (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%"
+            )
+        )
+
+    else:
+
+        items = query_db(
+            """
+            SELECT
+                oi.order_item_id,
+                oi.order_id,
+                oi.product_id,
+                p.name AS product_name,
+                oi.quantity,
+                oi.unit_price,
+                (oi.quantity * oi.unit_price) AS item_total
+            FROM order_items oi
+            JOIN products p
+                ON oi.product_id = p.product_id
+            ORDER BY oi.order_id DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                per_page,
+                offset
+            )
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM order_items
+            """
+        )
+
+    total_items = total_result[0]["total"]
+
+    total_pages = max(
+        1,
+        (total_items + per_page - 1) // per_page
     )
 
     return render_template(
         "order_items.html",
-        items=items
+        items=items,
+        search=search,
+        page=page,
+        total_pages=total_pages
     )
-
-
 # ============================================================
 # HISTORY
 # ============================================================
-
 @app.route("/history")
 def history():
 
-    history = query_db(
-        """
-        SELECT
-            h.history_id,
-            h.order_id,
-            h.old_status,
-            h.new_status,
-            h.changed_at,
-            h.changed_by
-        FROM history h
-        ORDER BY h.changed_at DESC
-        """
+    search = request.args.get("search", "").strip()
+
+    page, per_page, offset = get_pagination()
+
+    if search:
+
+        history = query_db(
+            """
+            SELECT
+                h.history_id,
+                h.order_id,
+                h.old_status,
+                h.new_status,
+                h.changed_at,
+                h.changed_by
+            FROM history h
+            WHERE
+                CAST(h.history_id AS CHAR) LIKE %s
+                OR CAST(h.order_id AS CHAR) LIKE %s
+                OR h.old_status LIKE %s
+                OR h.new_status LIKE %s
+                OR h.changed_by LIKE %s
+            ORDER BY h.changed_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                per_page,
+                offset
+            )
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM history h
+            WHERE
+                CAST(h.history_id AS CHAR) LIKE %s
+                OR CAST(h.order_id AS CHAR) LIKE %s
+                OR h.old_status LIKE %s
+                OR h.new_status LIKE %s
+                OR h.changed_by LIKE %s
+            """,
+            (
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%",
+                f"%{search}%"
+            )
+        )
+
+    else:
+
+        history = query_db(
+            """
+            SELECT
+                h.history_id,
+                h.order_id,
+                h.old_status,
+                h.new_status,
+                h.changed_at,
+                h.changed_by
+            FROM history h
+            ORDER BY h.changed_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (
+                per_page,
+                offset
+            )
+        )
+
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM history
+            """
+        )
+
+    total_history = total_result[0]["total"]
+
+    total_pages = max(
+        1,
+        (total_history + per_page - 1) // per_page
     )
 
     return render_template(
         "history.html",
-        history=history
+        history=history,
+        search=search,
+        page=page,
+        total_pages=total_pages
     )
-
-
 # ============================================================
 # REPORTS
 # ============================================================

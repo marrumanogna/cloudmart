@@ -2,7 +2,26 @@
 {% block page_title %}Customers{% endblock %}
 {% block content %}
 <div class="section">
-<div class="section-header"><h2>Customers</h2></div>
+<div class="section-header">
+
+    <h2>Customers</h2>
+
+    <form method="get"
+          action="{{ url_for('customers') }}"
+          class="search-form">
+
+        <input
+            type="text"
+            name="search"
+            placeholder="Search customers..."
+            value="{{ search }}"
+        >
+
+        <button type="submit">Search</button>
+
+    </form>
+
+</div>
 <div class="table-container">
 <table>
 <thead>
