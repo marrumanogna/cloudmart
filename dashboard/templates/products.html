@@ -1,59 +1,70 @@
 {% extends "base.html" %}
+
 {% block page_title %}Products{% endblock %}
+
 {% block content %}
+
 <div class="section">
-<div class="section-header">
-    <h2>Products</h2>
 
-    <form method="get" action="{{ url_for('products') }}" class="search-form">
-        <input
-            type="text"
-            name="search"
-            placeholder="Search products..."
-            value="{{ search }}"
-        >
-        <button type="submit">Search</button>
-    </form>
+    <div class="section-header">
+
+        <h2>Products</h2>
+
+        <form method="get"
+              action="{{ url_for('products') }}"
+              class="search-form">
+
+            <input
+                type="text"
+                name="search"
+                placeholder="Search products..."
+                value="{{ search }}"
+            >
+
+            <button type="submit">Search</button>
+
+        </form>
+
+    </div>
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for product in products %}
+
+                <tr>
+                    <td>{{ product.product_id }}</td>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.category }}</td>
+                    <td>{{ product.price }}</td>
+                    <td>{{ product.stock_count }}</td>
+                    <td>{{ product.created_at }}</td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    {% include "_pagination.html" %}
+
 </div>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-<th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Created</th>
-</tr>
-</thead>
-<tbody>
-{% for product in products %}
-<tr>
-<td>{{ product.product_id }}</td>
-<td>{{ product.name }}</td>
-<td>{{ product.category }}</td>
-<td>{{ product.price }}</td>
-<td>{{ product.stock_count }}</td>
-<td>{{ product.created_at }}</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-</div>
+
 {% endblock %}
-<div class="pagination">
-
-    {% if page > 1 %}
-        <a href="{{ url_for('products', page=page-1, search=search) }}">
-            Previous
-        </a>
-    {% endif %}
-
-    <span>
-        Page {{ page }} of {{ total_pages }}
-    </span>
-
-    {% if page < total_pages %}
-        <a href="{{ url_for('products', page=page+1, search=search) }}">
-            Next
-        </a>
-    {% endif %}
-
-</div>

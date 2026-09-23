@@ -381,10 +381,6 @@ def products():
 # CUSTOMERS
 # ============================================================
 
-# ============================================================
-# CUSTOMERS
-# ============================================================
-
 @app.route("/customers")
 def customers():
 
@@ -489,21 +485,19 @@ def customers():
             )
         )
 
+        total_result = query_db(
+            """
+            SELECT COUNT(*) AS total
+            FROM customers
+            """
+        )
+
     total_customers = total_result[0]["total"]
 
     total_pages = max(
         1,
         (total_customers + per_page - 1) // per_page
     )
-
-    return render_template(
-        "customers.html",
-        customers=customers,
-        search=search,
-        page=page,
-        total_pages=total_pages
-    )
-
 # ============================================================
 # CUSTOMER DETAILS
 # ============================================================
