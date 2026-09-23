@@ -1,46 +1,66 @@
 {% extends "base.html" %}
+
 {% block page_title %}Customers{% endblock %}
+
 {% block content %}
+
 <div class="section">
-<div class="section-header">
 
-    <h2>Customers</h2>
+    <div class="section-header">
 
-    <form method="get"
-          action="{{ url_for('customers') }}"
-          class="search-form">
+        <h2>Customers</h2>
 
-        <input
-            type="text"
-            name="search"
-            placeholder="Search customers..."
-            value="{{ search }}"
-        >
+        <form method="get"
+              action="{{ url_for('customers') }}"
+              class="search-form">
 
-        <button type="submit">Search</button>
+            <input
+                type="text"
+                name="search"
+                placeholder="Search customers..."
+                value="{{ search }}"
+            >
 
-    </form>
+            <button type="submit">Search</button>
+
+        </form>
+
+    </div>
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+                <tr>
+                    {% for key in customers[0].keys() if customers %}
+                        <th>{{ key }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for customer in customers %}
+
+                <tr>
+
+                    {% for value in customer.values() %}
+                        <td>{{ value }}</td>
+                    {% endfor %}
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    {% include "_pagination.html" %}
 
 </div>
-<div class="table-container">
-<table>
-<thead>
-<tr>
-{% for key in customers[0].keys() if customers %}
-<th>{{ key }}</th>
-{% endfor %}
-</tr>
-</thead>
-<tbody>
-{% for customer in customers %}
-<tr>
-{% for value in customer.values() %}
-<td>{{ value }}</td>
-{% endfor %}
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-</div>
+
 {% endblock %}

@@ -65,8 +65,6 @@ jobs:
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
             --capabilities CAPABILITY_NAMED_IAM
-
-
   # ============================================================
   # DATA
   # ============================================================
@@ -216,7 +214,6 @@ jobs:
               Environment=${{ env.ENVIRONMENT }} \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
-
   # ============================================================
   # API / APPLICATION
   # ============================================================
