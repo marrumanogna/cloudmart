@@ -71,7 +71,7 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-customer-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-customer-${Environment}:*
 
         - PolicyName: CustomerLambdaVpcAccess
           PolicyDocument:
@@ -143,7 +143,7 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-product-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-product-${Environment}:*
 
               - Effect: Allow
                 Action:
@@ -224,7 +224,7 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-order-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-order-${Environment}:*
 
               - Effect: Allow
                 Action:

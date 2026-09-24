@@ -130,29 +130,6 @@ Resources:
 
       Description: CloudMart database name
   
-  # ============================================================
-  # ARTIFACTS S3 BUCKET
-  # ============================================================
-
-  ArtifactsBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-
-      Tags:
-        - Key: Name
-          Value: !Sub cloudmart-artifacts-${Environment}
-
 
   # ============================================================
   # REPORTS S3 BUCKET
@@ -238,7 +215,7 @@ Resources:
                   - logs:PutLogEvents
 
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/CloudMart-DatabaseInit-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/CloudMart-DatabaseInit-${Environment}:*
 
 
               # ------------------------------------------------
@@ -357,16 +334,6 @@ Outputs:
     Export:
       Name:
         !Sub CloudMart-${Environment}-RdsPort
-
-
-  ArtifactsBucketName:
-
-    Value:
-      !Ref ArtifactsBucket
-
-    Export:
-      Name:
-        !Sub CloudMart-${Environment}-ArtifactsBucketName
 
 
   ReportsBucketName:

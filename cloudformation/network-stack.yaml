@@ -10,6 +10,23 @@ Parameters:
       - prod
 
 Resources:
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      Tags:
+        - Key: Name
+          Value: !Sub cloudmart-artifacts-${Environment}
   GitHubActionsRole:
     Type: AWS::IAM::Role
     DeletionPolicy: Retain
@@ -79,13 +96,13 @@ Resources:
             Action:
               - iam:PassRole
             Resource:
-              - arn:aws:iam::230623977534:role/cloudmart-customer-lambda-role-${Environment}
-              - arn:aws:iam::230623977534:role/cloudmart-product-lambda-role-${Environment}
-              - arn:aws:iam::230623977534:role/cloudmart-order-lambda-role-${Environment}
-              - arn:aws:iam::230623977534:role/cloudmart-order-processor-role-${Environment}
-              - arn:aws:iam::230623977534:role/cloudmart-report-lambda-role-${Environment}
-              - arn:aws:iam::230623977534:role/cloudmart-authorizer-role-${Environment}
-              - arn:aws:iam::230623977534:role/CloudMart-DatabaseInitLambda-${Environment}
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudmart-customer-lambda-role-${Environment}
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudmart-product-lambda-role-${Environment}
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudmart-order-lambda-role-${Environment}
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudmart-order-processor-role-${Environment}
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudmart-report-lambda-role-${Environment}
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cloudmart-authorizer-role-${Environment}
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/CloudMart-DatabaseInitLambda-${Environment}
 
           - Sid: IAMInstanceProfileManagement
             Effect: Allow
@@ -835,6 +852,13 @@ Outputs:
     Value: !Ref VpcEndpointSecurityGroup
     Export:
       Name: !Sub CloudMart-${Environment}-VpcEndpointSecurityGroupId
+
+  ArtifactsBucketName:
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: !Sub CloudMart-${Environment}-ArtifactsBucketName
+
+
 
 
 

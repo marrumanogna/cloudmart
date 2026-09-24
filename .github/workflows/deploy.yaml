@@ -91,33 +91,15 @@ jobs:
       - name: Get Artifacts Bucket
         run: |
           ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
-            --output text 2>/dev/null || true)
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
-          if [ -z "$ARTIFACTS_BUCKET" ] || [ "$ARTIFACTS_BUCKET" = "None" ]; then
-            echo "Artifacts bucket does not exist yet."
-            echo "The data stack creates the bucket, so packaging cannot use it before first deployment."
-          else
-            echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
-          fi
-
-      # --------------------------------------------------------
-      # Get bucket after first deployment
-      # --------------------------------------------------------
-
-      - name: Get Artifacts Bucket After Deployment
-        run: |
-          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
-            --output text)
-
-          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
+          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> "$GITHUB_ENV"
 
           echo "Artifacts bucket:"
           echo "$ARTIFACTS_BUCKET"
-
       # --------------------------------------------------------
       # Package Database Init Lambda
       # --------------------------------------------------------
@@ -188,7 +170,7 @@ jobs:
       - name: Get Artifacts Bucket
         run: |
           ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
             --output text)
 
@@ -244,7 +226,7 @@ jobs:
       - name: Get Artifacts Bucket
         run: |
           ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
             --output text)
 
@@ -305,7 +287,7 @@ jobs:
       - name: Get Artifacts Bucket
         run: |
           ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
             --output text)
 
