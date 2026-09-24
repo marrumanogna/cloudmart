@@ -15,7 +15,7 @@ app.config["SECRET_KEY"] = os.environ["FLASK_SECRET_KEY"]
 
 AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 REPORTS_BUCKET = os.environ["REPORTS_BUCKET"]
-ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
+ADMIN_TOKEN = os.environ["ADMIN_TOKEN"]
 
 
 ssm = boto3.client(
@@ -82,13 +82,13 @@ def login():
 
         try:
 
-            stored_token = get_parameter(
-                ADMIN_TOKEN_PARAMETER
+            stored_token = ADMIN_TOKEN(
+
             )
 
             if hmac.compare_digest(
                 entered_token,
-                stored_token
+                ADMIN_TOKEN
             ):
 
                 session["admin_authenticated"] = True
@@ -121,12 +121,8 @@ def get_db_connection():
     return pymysql.connect(
         host=os.environ["DB_HOST"],
         port=int(os.environ.get("DB_PORT", "3306")),
-        user=get_parameter(
-            os.environ["DB_USERNAME_PARAMETER"]
-        ),
-        password=get_parameter(
-            os.environ["DB_PASSWORD_PARAMETER"]
-        ),
+        user=os.environ["DB_USERNAME"],
+        password=os.environ["DB_PASSWORD"],
         database=os.environ.get(
             "DB_NAME",
             "cloudmart"
