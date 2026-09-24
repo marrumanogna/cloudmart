@@ -18,28 +18,11 @@ REPORTS_BUCKET = os.environ["REPORTS_BUCKET"]
 ADMIN_TOKEN = os.environ["ADMIN_TOKEN"]
 
 
-ssm = boto3.client(
-    "ssm",
-    region_name=AWS_REGION
-)
-
 s3 = boto3.client(
     "s3",
     region_name=AWS_REGION
 )
 
-# ============================================================
-# SSM PARAMETER
-# ============================================================
-
-def get_parameter(name):
-
-    response = ssm.get_parameter(
-        Name=name,
-        WithDecryption=True
-    )
-
-    return response["Parameter"]["Value"]
 # ============================================================
 # ADMIN AUTHENTICATION
 # ============================================================
@@ -82,9 +65,7 @@ def login():
 
         try:
 
-            stored_token = ADMIN_TOKEN(
-
-            )
+            stored_token = ADMIN_TOKEN
 
             if hmac.compare_digest(
                 entered_token,
