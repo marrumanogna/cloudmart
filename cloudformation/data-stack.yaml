@@ -19,17 +19,13 @@ Parameters:
   DBUsername:
     Type: String
     NoEcho: true
-    Default: cloudmartadmin
 
   DBPassword:
     Type: String
     NoEcho: true
-    Default: TEMP
 
   NotificationEmail:
     Type: String
-    Default: TEMP
-
 
 Resources:
 

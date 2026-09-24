@@ -234,7 +234,6 @@ Resources:
               - ssm:GetParameter
               - ssm:PutParameter
             Resource:
-              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:*:parameter/cloudmart/${Environment}/auth/customer-token
               - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:*:parameter/cloudmart/${Environment}/auth/admin-token
 
   GitHubActionsEC2InstanceProfilePolicy:
