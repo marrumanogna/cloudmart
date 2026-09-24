@@ -7,9 +7,6 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues:
-      - dev
-      - prod
   
   AdminToken:
     Type: String
