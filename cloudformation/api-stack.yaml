@@ -618,7 +618,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Sub '{{resolve:ssm:/cloudmart/${Environment}/notifications/email}}'
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref OrderFailedTopic
 
   OrderFailedRule:
