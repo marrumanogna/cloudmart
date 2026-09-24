@@ -11,10 +11,7 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-  AdminToken:
-  Type: String
-  NoEcho: true
-  
+
   DBUsername:
     Type: String
     NoEcho: true
