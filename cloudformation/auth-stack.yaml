@@ -10,20 +10,20 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-
+  
   AdminToken:
     Type: String
     NoEcho: true
-    Default: TEMP
+
+  DBUsername:
+    Type: String
+    NoEcho: true
+
+  DBPassword:
+    Type: String
+    NoEcho: true
 
 Resources:
-
-  AdminTokenParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/auth/admin-token
-      Type: String
-      Value: !Ref AdminToken
 
   AuthorizerRole:
     Type: AWS::IAM::Role
@@ -108,7 +108,7 @@ Resources:
 
       Environment:
         Variables:
-          ADMIN_TOKEN_PARAMETER: !Ref AdminTokenParameter
+          ADMIN_TOKEN: !Ref AdminToken
 
           DB_HOST:
             Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
@@ -119,8 +119,8 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
       CodeUri: ../authorizer-code/
 

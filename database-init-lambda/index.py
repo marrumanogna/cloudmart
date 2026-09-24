@@ -1,17 +1,5 @@
 import os
-import boto3
 import pymysql
-
-
-def get_parameter(name):
-    ssm = boto3.client("ssm")
-
-    response = ssm.get_parameter(
-        Name=name,
-        WithDecryption=True
-    )
-
-    return response["Parameter"]["Value"]
 
 
 def lambda_handler(event, context):
@@ -22,8 +10,8 @@ def lambda_handler(event, context):
         db_host = os.environ["DB_HOST"]
         db_name = os.environ.get("DB_NAME", "cloudmart")
 
-        db_user = get_parameter(os.environ["DB_USER_PARAMETER"])
-        db_password = get_parameter(os.environ["DB_PASSWORD_PARAMETER"])
+        db_user = os.environ["DB_USERNAME"]
+        db_password = os.environ["DB_PASSWORD"]
 
         connection = pymysql.connect(
             host=db_host,

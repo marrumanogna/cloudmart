@@ -149,10 +149,11 @@ jobs:
             --template-file cloudformation/data-stack-packaged.yaml \
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
+            Environment=${{ env.ENVIRONMENT }} \
+            DBUsername="${{ secrets.DB_USERNAME }}" \
+            DBPassword="${{ secrets.DB_PASSWORD }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
-
   # --------------------------------------------------------
   # Run Database Initialization Lambda
   # --------------------------------------------------------
@@ -211,9 +212,12 @@ jobs:
             --template-file cloudformation/auth-stack-packaged.yaml \
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
+             Environment=${{ env.ENVIRONMENT }} \
+             AdminToken="${{ secrets.ADMIN_TOKEN }}" \
+             DBUsername="${{ secrets.DB_USERNAME }}" \
+             DBPassword="${{ secrets.DB_PASSWORD }}" \
+             --capabilities CAPABILITY_NAMED_IAM \
+             --region ${{ env.AWS_REGION }}
   # ============================================================
   # API / APPLICATION
   # ============================================================
@@ -260,10 +264,13 @@ jobs:
             --template-file cloudformation/api-stack-packaged.yaml \
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              NotificationEmail="/cloudmart/${{ env.ENVIRONMENT }}/notifications/email" \
+            Environment=${{ env.ENVIRONMENT }} \
+            DBUsername="${{ secrets.DB_USERNAME }}" \
+            DBPassword="${{ secrets.DB_PASSWORD }}" \
+            NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
             --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset
 
       - name: Show API Outputs
         run: |
@@ -350,8 +357,11 @@ jobs:
             --template-file cloudformation/reporting-stack.yaml \
             --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              DashboardVersion=${{ github.sha }} \
+            Environment=${{ env.ENVIRONMENT }} \
+            DashboardVersion=${{ github.sha }} \
+            DBUsername="${{ secrets.DB_USERNAME }}" \
+            DBPassword="${{ secrets.DB_PASSWORD }}" \
+            AdminToken="${{ secrets.ADMIN_TOKEN }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }} \
             --no-fail-on-empty-changeset
@@ -425,7 +435,7 @@ jobs:
             --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
-              AlarmEmail="/cloudmart/${{ env.ENVIRONMENT }}/notifications/email" \
+              AlarmEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
               DashboardInstanceId=$DASHBOARD_INSTANCE_ID \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }} \

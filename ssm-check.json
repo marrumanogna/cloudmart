@@ -1,0 +1,8 @@
+{
+  "commands": [
+    "python3 - <<'PY'",
+    "p='/opt/cloudmart-dashboard/templates/customers.html'",
+    "print(open(p).read())",
+    "PY"
+  ]
+}

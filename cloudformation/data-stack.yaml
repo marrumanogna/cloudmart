@@ -33,27 +33,6 @@ Parameters:
 
 Resources:
 
-  RdsUsernameParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/username
-      Type: String
-      Value: !Ref DBUsername
-
-  RdsPasswordParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/rds/password
-      Type: String
-      Value: !Ref DBPassword
-
-  NotificationEmailParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /cloudmart/${Environment}/notifications/email
-      Type: String
-      Value: !Ref NotificationEmail
-
   # ============================================================
   # RDS SUBNET GROUP
   # ============================================================
@@ -88,7 +67,9 @@ Resources:
 
       DBName: !Ref DBName
 
-      MasterUsername: cloudmartadmin
+      MasterUsername: !Ref DBUsername
+
+      MasterUserPassword: !Ref DBPassword
 
       DBInstanceClass: db.t3.micro
 
@@ -321,11 +302,8 @@ Resources:
           DB_NAME:
             !Ref DBName
 
-          DB_USER_PARAMETER:
-            !Sub /cloudmart/${Environment}/rds/username
-
-          DB_PASSWORD_PARAMETER:
-            !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
   DatabaseInitLambdaInvokePolicy:
   

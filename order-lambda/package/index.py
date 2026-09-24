@@ -64,15 +64,8 @@ def get_db_connection():
         WithDecryption=True
     )["Parameter"]["Value"]
 
-    username = ssm_client.get_parameter(
-        Name=f"/cloudmart/{environment}/rds/username",
-        WithDecryption=True
-    )["Parameter"]["Value"]
-
-    password = ssm_client.get_parameter(
-        Name=f"/cloudmart/{environment}/rds/password",
-        WithDecryption=True
-    )["Parameter"]["Value"]
+    username = os.environ["DB_USERNAME"]
+    password = os.environ["DB_PASSWORD"]
 
     database = ssm_client.get_parameter(
         Name=f"/cloudmart/{environment}/rds/db-name",

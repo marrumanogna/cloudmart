@@ -13,9 +13,21 @@ Parameters:
     Type: String
     Default: dev
 
-  DashboardVersion:
+  DBUsername:
     Type: String
-    Default: initial
+    NoEcho: true
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+
+  AdminToken:
+    Type: String
+    NoEcho: true
+
+    DashboardVersion:
+      Type: String
+      Default: initial
 
   LatestAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>

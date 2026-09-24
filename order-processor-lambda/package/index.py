@@ -8,6 +8,9 @@ cloudwatch = boto3.client("cloudwatch")
 METRIC_NAMESPACE = "CloudMart/Operations"
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
 
+lambda_client = boto3.client("lambda")
+sqs = boto3.client("sqs")
+events_client = boto3.client("events")
 
 def publish_metric(metric_name):
     cloudwatch.put_metric_data(
@@ -27,25 +30,14 @@ def publish_metric(metric_name):
         ]
     )
 
-ssm = boto3.client("ssm")
-sqs = boto3.client("sqs")
-events_client = boto3.client("events")
-
-
 def get_db_connection():
     print("DEBUG: Starting get_db_connection")
 
-    print("DEBUG: Getting DB username from SSM")
-    username = ssm.get_parameter(
-        Name=os.environ["DB_USERNAME_PARAMETER"],
-        WithDecryption=True
-    )["Parameter"]["Value"]
+    print("DEBUG: Getting DB username from environment")
+    username = os.environ["DB_USERNAME"]
 
-    print("DEBUG: Getting DB password from SSM")
-    password = ssm.get_parameter(
-        Name=os.environ["DB_PASSWORD_PARAMETER"],
-        WithDecryption=True
-    )["Parameter"]["Value"]
+    print("DEBUG: Getting DB password from environment")
+    password = os.environ["DB_PASSWORD"]
 
     print("DEBUG: Connecting to RDS")
 

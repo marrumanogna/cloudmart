@@ -1,29 +1,15 @@
-import boto3
 import os
 import pymysql
-
-ssm = boto3.client("ssm")
-
-ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
 
 DB_HOST = os.environ["DB_HOST"]
 DB_PORT = int(os.environ["DB_PORT"])
 DB_NAME = os.environ["DB_NAME"]
-DB_USERNAME_PARAMETER = os.environ["DB_USERNAME_PARAMETER"]
-DB_PASSWORD_PARAMETER = os.environ["DB_PASSWORD_PARAMETER"]
-
-
-def get_parameter(parameter_name):
-    response = ssm.get_parameter(
-        Name=parameter_name,
-        WithDecryption=True
-    )
-    return response["Parameter"]["Value"]
 
 
 def get_customer_by_token(customer_token):
-    username = get_parameter(DB_USERNAME_PARAMETER)
-    password = get_parameter(DB_PASSWORD_PARAMETER)
+    username = os.environ["DB_USERNAME"]
+    password = os.environ["DB_PASSWORD"]
+    admin_token = os.environ["ADMIN_TOKEN"]
 
     connection = pymysql.connect(
         host=DB_HOST,
@@ -108,7 +94,7 @@ def lambda_handler(event, context):
         provided_token = provided_token[7:].strip()
 
     try:
-        admin_token = get_parameter(ADMIN_TOKEN_PARAMETER)
+        admin_token = ADMIN_TOKEN
 
         if provided_token == admin_token:
             print("Admin authenticated")

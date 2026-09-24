@@ -11,9 +11,20 @@ Parameters:
     AllowedValues:
       - dev
       - prod
+  AdminToken:
+  Type: String
+  NoEcho: true
+  
+  DBUsername:
+    Type: String
+    NoEcho: true
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+
   NotificationEmail:
-    Type: AWS::SSM::Parameter::Value<String>
-    Description: SSM parameter containing the CloudMart notification email
+    Type: String
 
 Resources:
 
@@ -730,8 +741,8 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
           EVENT_BUS_NAME: !Ref CloudMartEventBus
           LOW_STOCK_TOPIC_ARN: !Ref LowStockTopic

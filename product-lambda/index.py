@@ -30,15 +30,9 @@ def publish_metric(metric_name):
 
 
 def get_db_connection():
-    username = ssm.get_parameter(
-        Name=os.environ["DB_USERNAME_PARAMETER"],
-        WithDecryption=True
-    )["Parameter"]["Value"]
 
-    password = ssm.get_parameter(
-        Name=os.environ["DB_PASSWORD_PARAMETER"],
-        WithDecryption=True
-    )["Parameter"]["Value"]
+    username = os.environ["DB_USERNAME"]
+    password = os.environ["DB_PASSWORD"]
 
     return pymysql.connect(
         host=os.environ["DB_HOST"],

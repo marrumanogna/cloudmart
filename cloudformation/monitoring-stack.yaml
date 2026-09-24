@@ -9,7 +9,7 @@ Parameters:
     Default: dev
 
   AlarmEmail:
-    Type: AWS::SSM::Parameter::Value<String>
+    Type: String
     Description: SSM parameter containing the alarm notification email
 
   DashboardInstanceId:

@@ -8,36 +8,13 @@ import boto3
 import pymysql
 from botocore.config import Config
 
-# ------------------------------------------------------------
-# AWS CLIENTS
-# ------------------------------------------------------------
-
 aws_config = Config(
     connect_timeout=5,
     read_timeout=5,
     retries={"max_attempts": 1}
 )
 
-ssm = boto3.client("ssm", config=aws_config)
 s3 = boto3.client("s3", config=aws_config)
-
-
-# ------------------------------------------------------------
-# SSM PARAMETER
-# ------------------------------------------------------------
-
-def get_parameter(name):
-    print(f"REPORT: Calling SSM get_parameter for {name}")
-
-    response = ssm.get_parameter(
-        Name=name,
-        WithDecryption=True
-    )
-
-    print(f"REPORT: SSM get_parameter succeeded for {name}")
-
-    return response["Parameter"]["Value"]
-
 
 # ------------------------------------------------------------
 # DATABASE CONNECTION
@@ -45,21 +22,13 @@ def get_parameter(name):
 
 def get_db_connection():
 
-    print("REPORT: Fetching DB username from SSM")
+    print("REPORT: Getting DB username from environment")
 
-    username = get_parameter(
-        os.environ["DB_USERNAME_PARAMETER"]
-    )
+    username = os.environ["DB_USERNAME"]
 
-    print("REPORT: DB username fetched from SSM")
+    print("REPORT: Getting DB password from environment")
 
-    print("REPORT: Fetching DB password from SSM")
-
-    password = get_parameter(
-        os.environ["DB_PASSWORD_PARAMETER"]
-    )
-
-    print("REPORT: DB password fetched from SSM")
+    password = os.environ["DB_PASSWORD"]
 
     print("REPORT: Connecting to RDS")
 
@@ -78,7 +47,6 @@ def get_db_connection():
     print("REPORT: Connected to RDS successfully")
 
     return connection
-
 
 # ------------------------------------------------------------
 # LAMBDA HANDLER
