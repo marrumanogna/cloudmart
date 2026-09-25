@@ -734,7 +734,7 @@ Resources:
 
       ApplyOnlyAtCronInterval: false
 
-      WaitForSuccessTimeoutSeconds: 600
+      WaitForSuccessTimeoutSeconds: 1200
 
       Parameters:
 
@@ -1011,52 +1011,7 @@ Resources:
                 Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
               DashboardVersion: !Ref DashboardVersion
-  DashboardRefreshAssociation:
-    Type: AWS::SSM::Association
-    DependsOn:
-      - DashboardInstanceV9
-    Properties:
-      AssociationName:
-        !Sub cloudmart-dashboard-refresh-${Environment}
-      Name: AWS-RunShellScript
-      Targets:
-        - Key: InstanceIds
-          Values:
-            - !Ref DashboardInstanceV9
-      WaitForSuccessTimeoutSeconds: 600
-      Parameters:
-        commands:
-          - !Sub
-            - |
-              set -euxo pipefail
 
-              echo "===== Refreshing CloudMart Dashboard ====="
-              echo "Dashboard version: ${DashboardVersion}"
-
-              echo "===== Downloading latest dashboard ====="
-              aws s3 cp "s3://${ArtifactsBucket}/dashboard/cloudmart-dashboard.zip" /tmp/cloudmart-dashboard.zip
-
-              echo "===== Replacing dashboard files ====="
-              rm -rf /opt/cloudmart-dashboard/*
-              unzip -o /tmp/cloudmart-dashboard.zip -d /opt/cloudmart-dashboard
-
-              echo "===== Recreating Python environment ====="
-              python3 -m venv /opt/cloudmart-dashboard/venv
-              /opt/cloudmart-dashboard/venv/bin/pip install --upgrade pip
-              /opt/cloudmart-dashboard/venv/bin/pip install -r /opt/cloudmart-dashboard/requirements.txt
-
-              chown -R ec2-user:ec2-user /opt/cloudmart-dashboard
-
-              echo "===== Restarting dashboard ====="
-              systemctl daemon-reload
-              systemctl restart cloudmart-dashboard
-
-              echo "===== Checking dashboard ====="
-              curl -f http://127.0.0.1:8000/health
-
-              echo "===== Dashboard refresh completed ====="
-            - ArtifactsBucket:
-                Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
 
 # ============================================================
 # OUTPUTS
