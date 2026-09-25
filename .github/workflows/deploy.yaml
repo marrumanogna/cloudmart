@@ -30,10 +30,445 @@ env:
 jobs:
 
   # ============================================================
+  # BOOTSTRAP GITHUB ACTIONS IAM
+  # ============================================================
+
+  bootstrap-iam:
+    name: Bootstrap GitHub Actions IAM
+    runs-on: ubuntu-latest
+    outputs:
+      role_arn: ${{ steps.cloudmart-role.outputs.role_arn }}
+
+    steps:
+      - name: Configure Bootstrap AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get AWS Account ID
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity \
+            --query Account \
+            --output text)
+
+          echo "ACCOUNT_ID=$ACCOUNT_ID" >> "$GITHUB_ENV"
+
+      - name: Create GitHub OIDC Provider
+        shell: bash
+        run: |
+          OIDC_ARN="arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
+
+          if aws iam get-open-id-connect-provider \
+            --open-id-connect-provider-arn "$OIDC_ARN" >/dev/null 2>&1
+          then
+            echo "GitHub OIDC provider already exists."
+          else
+            aws iam create-open-id-connect-provider \
+              --url https://token.actions.githubusercontent.com \
+              --client-id-list sts.amazonaws.com
+
+            echo "GitHub OIDC provider created."
+          fi
+
+      - name: Create GitHub Actions Trust Policy
+        shell: bash
+        run: |
+          cat > trust-policy.json <<'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "arn:aws:iam::ACCOUNT_ID_PLACEHOLDER:oidc-provider/token.actions.githubusercontent.com"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                  },
+                  "StringLike": {
+                    "token.actions.githubusercontent.com:sub": [
+                      "repo:marrumanogna@223441351/cloudmart@1341672607:ref:refs/heads/*"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+
+          sed -i "s/ACCOUNT_ID_PLACEHOLDER/${ACCOUNT_ID}/g" trust-policy.json
+
+      - name: Create or Update GitHub Actions Role
+        shell: bash
+        run: |
+          ROLE_NAME="CloudMart-GitHubActions-Role"
+
+          if aws iam get-role \
+            --role-name "$ROLE_NAME" >/dev/null 2>&1
+          then
+            echo "Role already exists. Updating trust policy."
+
+            aws iam update-assume-role-policy \
+              --role-name "$ROLE_NAME" \
+              --policy-document file://trust-policy.json
+          else
+            echo "Creating GitHub Actions role."
+
+            aws iam create-role \
+              --role-name "$ROLE_NAME" \
+              --description "GitHub Actions deployment role for CloudMart" \
+              --assume-role-policy-document file://trust-policy.json
+          fi
+      - name: Set CloudMart Role ARN
+        id: cloudmart-role
+        run: |
+          ROLE_ARN=$(aws iam get-role \
+            --role-name CloudMart-GitHubActions-Role \
+            --query "Role.Arn" \
+            --output text)
+
+          echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Create Deployment Policy
+        shell: bash
+        run: |
+          cat > deployment-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "cloudformation:CreateStack",
+                  "cloudformation:UpdateStack",
+                  "cloudformation:DeleteStack",
+                  "cloudformation:DescribeStacks",
+                  "cloudformation:DescribeStackEvents",
+                  "cloudformation:DescribeStackResources",
+                  "cloudformation:DescribeStackResource",
+                  "cloudformation:GetTemplate",
+                  "cloudformation:GetTemplateSummary",
+                  "cloudformation:ValidateTemplate",
+                  "cloudformation:ListStackResources",
+                  "cloudformation:CreateChangeSet",
+                  "cloudformation:ExecuteChangeSet",
+                  "cloudformation:DeleteChangeSet",
+                  "cloudformation:DescribeChangeSet",
+                  "cloudformation:ListChangeSets"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "iam:CreateRole",
+                  "iam:DeleteRole",
+                  "iam:GetRole",
+                  "iam:UpdateRole",
+                  "iam:UpdateAssumeRolePolicy",
+                  "iam:PutRolePolicy",
+                  "iam:DeleteRolePolicy",
+                  "iam:GetRolePolicy",
+                  "iam:AttachRolePolicy",
+                  "iam:DetachRolePolicy",
+                  "iam:TagRole",
+                  "iam:UntagRole",
+                  "iam:CreateInstanceProfile",
+                  "iam:DeleteInstanceProfile",
+                  "iam:GetInstanceProfile",
+                  "iam:AddRoleToInstanceProfile",
+                  "iam:RemoveRoleFromInstanceProfile"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": "iam:PassRole",
+                "Resource": [
+                  "arn:aws:iam::${ACCOUNT_ID}:role/cloudmart-customer-lambda-role-${ENVIRONMENT}",
+                  "arn:aws:iam::${ACCOUNT_ID}:role/cloudmart-product-lambda-role-${ENVIRONMENT}",
+                  "arn:aws:iam::${ACCOUNT_ID}:role/cloudmart-order-lambda-role-${ENVIRONMENT}",
+                  "arn:aws:iam::${ACCOUNT_ID}:role/cloudmart-order-processor-role-${ENVIRONMENT}",
+                  "arn:aws:iam::${ACCOUNT_ID}:role/cloudmart-report-lambda-role-${ENVIRONMENT}",
+                  "arn:aws:iam::${ACCOUNT_ID}:role/cloudmart-authorizer-role-${ENVIRONMENT}",
+                  "arn:aws:iam::${ACCOUNT_ID}:role/CloudMart-DatabaseInitLambda-${ENVIRONMENT}"
+                ]
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "lambda:CreateFunction",
+                  "lambda:UpdateFunctionCode",
+                  "lambda:UpdateFunctionConfiguration",
+                  "lambda:DeleteFunction",
+                  "lambda:GetFunction",
+                  "lambda:GetFunctionConfiguration",
+                  "lambda:AddPermission",
+                  "lambda:RemovePermission",
+                  "lambda:GetPolicy",
+                  "lambda:ListVersionsByFunction",
+                  "lambda:PublishVersion",
+                  "lambda:CreateAlias",
+                  "lambda:UpdateAlias",
+                  "lambda:DeleteAlias",
+                  "lambda:TagResource",
+                  "lambda:InvokeFunction"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "apigateway:GET",
+                  "apigateway:POST",
+                  "apigateway:PUT",
+                  "apigateway:PATCH",
+                  "apigateway:DELETE"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "events:DescribeEventBus",
+                  "events:CreateEventBus",
+                  "events:DeleteEventBus",
+                  "events:PutRule",
+                  "events:DeleteRule",
+                  "events:PutTargets",
+                  "events:RemoveTargets",
+                  "events:DescribeRule",
+                  "events:ListTargetsByRule",
+                  "events:TagResource",
+                  "events:UntagResource"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "sns:CreateTopic",
+                  "sns:DeleteTopic",
+                  "sns:GetTopicAttributes",
+                  "sns:SetTopicAttributes",
+                  "sns:Subscribe",
+                  "sns:Unsubscribe",
+                  "sns:ListSubscriptionsByTopic",
+                  "sns:Publish",
+                  "sns:TagResource",
+                  "sns:UntagResource"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "sqs:CreateQueue",
+                  "sqs:DeleteQueue",
+                  "sqs:GetQueueAttributes",
+                  "sqs:SetQueueAttributes",
+                  "sqs:TagQueue",
+                  "sqs:UntagQueue",
+                  "sqs:ListQueueTags"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "rds:CreateDBInstance",
+                  "rds:DeleteDBInstance",
+                  "rds:ModifyDBInstance",
+                  "rds:DescribeDBInstances",
+                  "rds:CreateDBSubnetGroup",
+                  "rds:DeleteDBSubnetGroup",
+                  "rds:ModifyDBSubnetGroup",
+                  "rds:DescribeDBSubnetGroups",
+                  "rds:AddTagsToResource",
+                  "rds:ListTagsForResource"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:CreateBucket",
+                  "s3:DeleteBucket",
+                  "s3:GetBucketLocation",
+                  "s3:GetBucketTagging",
+                  "s3:PutBucketTagging",
+                  "s3:GetEncryptionConfiguration",
+                  "s3:PutEncryptionConfiguration",
+                  "s3:GetPublicAccessBlock",
+                  "s3:PutPublicAccessBlock",
+                  "s3:GetBucketPublicAccessBlock",
+                  "s3:ListBucket",
+                  "s3:PutObject",
+                  "s3:GetObject",
+                  "s3:DeleteObject"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "ec2:DescribeImages",
+                  "ec2:DescribeInstances",
+                  "ec2:DescribeSubnets",
+                  "ec2:DescribeSecurityGroups",
+                  "ec2:DescribeVpcs",
+                  "ec2:RunInstances",
+                  "ec2:TerminateInstances",
+                  "ec2:CreateTags",
+                  "ec2:ModifyInstanceAttribute",
+                  "ec2:StartInstances",
+                  "ec2:StopInstances",
+                  "ec2:CreateVpc",
+                  "ec2:DeleteVpc",
+                  "ec2:ModifyVpcAttribute",
+                  "ec2:DescribeAvailabilityZones",
+                  "ec2:CreateSubnet",
+                  "ec2:DeleteSubnet",
+                  "ec2:ModifySubnetAttribute",
+                  "ec2:CreateRouteTable",
+                  "ec2:DeleteRouteTable",
+                  "ec2:DescribeRouteTables",
+                  "ec2:CreateRoute",
+                  "ec2:ReplaceRoute",
+                  "ec2:DeleteRoute",
+                  "ec2:AssociateRouteTable",
+                  "ec2:DisassociateRouteTable",
+                  "ec2:CreateInternetGateway",
+                  "ec2:DeleteInternetGateway",
+                  "ec2:AttachInternetGateway",
+                  "ec2:DetachInternetGateway",
+                  "ec2:DescribeInternetGateways",
+                  "ec2:CreateSecurityGroup",
+                  "ec2:DeleteSecurityGroup",
+                  "ec2:DescribeSecurityGroups",
+                  "ec2:AuthorizeSecurityGroupIngress",
+                  "ec2:RevokeSecurityGroupIngress",
+                  "ec2:AuthorizeSecurityGroupEgress",
+                  "ec2:RevokeSecurityGroupEgress",
+                  "ec2:CreateVpcEndpoint",
+                  "ec2:DeleteVpcEndpoints",
+                  "ec2:DescribeVpcEndpoints",
+                  "ec2:ModifyVpcEndpoint"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "ssm:GetParameter",
+                  "ssm:GetParameters",
+                  "ssm:DescribeParameters",
+                  "ssm:PutParameter",
+                  "ssm:DeleteParameter",
+                  "ssm:CreateAssociation",
+                  "ssm:UpdateAssociation",
+                  "ssm:DeleteAssociation",
+                  "ssm:DescribeAssociation",
+                  "ssm:AddTagsToResource",
+                  "ssm:RemoveTagsFromResource",
+                  "ssm:ListTagsForResource",
+                  "ssm:GetServiceSetting",
+                  "ssm:UpdateServiceSetting",
+                  "ssm:ResetServiceSetting"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogGroup",
+                  "logs:DeleteLogGroup",
+                  "logs:CreateLogStream",
+                  "logs:DeleteLogStream",
+                  "logs:PutLogEvents",
+                  "logs:DescribeLogGroups",
+                  "logs:DescribeLogStreams",
+                  "logs:PutRetentionPolicy",
+                  "logs:DeleteRetentionPolicy",
+                  "logs:TagResource",
+                  "logs:UntagResource"
+                ],
+                "Resource": "*"
+              },
+
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "cloudwatch:PutMetricAlarm",
+                  "cloudwatch:DeleteAlarms",
+                  "cloudwatch:DescribeAlarms",
+                  "cloudwatch:PutDashboard",
+                  "cloudwatch:DeleteDashboards",
+                  "cloudwatch:GetDashboard",
+                  "cloudwatch:ListDashboards"
+                ],
+                "Resource": "*"
+              }
+
+            ]
+          }
+          EOF
+
+          aws iam put-role-policy \
+            --role-name CloudMart-GitHubActions-Role \
+            --policy-name CloudMartGitHubActionsDeployment \
+            --policy-document file://deployment-policy.json
+
+      - name: Create Admin Token SSM Policy
+        shell: bash
+        run: |
+          cat > auth-ssm-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "ssm:GetParameter",
+                  "ssm:PutParameter"
+                ],
+                "Resource": "arn:aws:ssm:${AWS_REGION}:${ACCOUNT_ID}:parameter/cloudmart/${ENVIRONMENT}/auth/admin-token"
+              }
+            ]
+          }
+          EOF
+
+          aws iam put-role-policy \
+            --role-name CloudMart-GitHubActions-Role \
+            --policy-name CloudMartAuthSSMAccess \
+            --policy-document file://auth-ssm-policy.json
+
+      - name: Bootstrap Complete
+        run: |
+          echo "GitHub Actions IAM bootstrap completed successfully."
+
+  # ============================================================
   # NETWORK
   # ============================================================
 
   deploy-network:
+    needs: bootstrap-iam
     name: Deploy Network Stack
     runs-on: ubuntu-latest
 
@@ -46,10 +481,11 @@ jobs:
           echo "Ref: $GITHUB_REF"
           echo "Branch: $GITHUB_REF_NAME"
           echo "Event: $GITHUB_EVENT_NAME"
+      
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ needs.bootstrap-iam.outputs.role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Validate Network Template
@@ -71,7 +507,9 @@ jobs:
 
   deploy-data:
     name: Deploy Data Stack
-    needs: deploy-network
+    needs:
+      - bootstrap-iam
+      - deploy-network
     runs-on: ubuntu-latest
 
     steps:
@@ -81,7 +519,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ needs.bootstrap-iam.outputs.role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
       # --------------------------------------------------------
@@ -154,7 +592,9 @@ jobs:
 
   deploy-auth:
     name: Deploy Auth Stack
-    needs: deploy-data
+    needs:
+      - bootstrap-iam
+      - deploy-data
     runs-on: ubuntu-latest
 
     steps:
@@ -164,7 +604,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ needs.bootstrap-iam.outputs.role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Get Artifacts Bucket
@@ -205,7 +645,9 @@ jobs:
   # ============================================================
   deploy-api:
     name: Deploy API and Application Stack
-    needs: deploy-auth
+    needs:
+      - bootstrap-iam
+      - deploy-auth
     runs-on: ubuntu-latest
 
     steps:
@@ -215,7 +657,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ needs.bootstrap-iam.outputs.role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Validate API Template
@@ -266,7 +708,9 @@ jobs:
 
   deploy-reporting:
     name: Deploy Reporting and Dashboard Stack
-    needs: deploy-api
+    needs:
+      - bootstrap-iam
+      - deploy-api
     runs-on: ubuntu-latest
 
     steps:
@@ -278,7 +722,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ needs.bootstrap-iam.outputs.role_arn }}
           aws-region: ${{ env.AWS_REGION }}
       # --------------------------------------------------------
       # Get Artifacts Bucket
