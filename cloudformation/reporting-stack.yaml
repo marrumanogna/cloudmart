@@ -32,6 +32,8 @@ Parameters:
     AdminToken:
       Type: String
       NoEcho: true
+
+
 # ============================================================
 # RESOURCES
 # ============================================================
@@ -78,6 +80,7 @@ Resources:
 
       SourceArn: !GetAtt DailyReportSchedule.Arn
 
+
   # ============================================================
   # DASHBOARD EC2 IAM ROLE
   # ============================================================
@@ -107,8 +110,6 @@ Resources:
 
       # --------------------------------------------------------
       # AWS managed policy
-      # --------------------------------------------------------
-      # Required for AWS Systems Manager Session Manager
       # --------------------------------------------------------
 
       ManagedPolicyArns:
@@ -178,7 +179,6 @@ Resources:
 
             Statement:
 
-              # List reports bucket
               - Effect: Allow
 
                 Action:
@@ -191,7 +191,6 @@ Resources:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
 
 
-              # Read report files
               - Effect: Allow
 
                 Action:
@@ -373,11 +372,15 @@ Resources:
 
               aws --version
 
+
               # ==================================================
-              # DASHBOARD DIRECTORY
+              # DASHBOARD DIRECTORIES
               # ==================================================
 
               mkdir -p /opt/cloudmart-dashboard
+
+              mkdir -p /var/lib/cloudmart-dashboard
+
 
               # ==================================================
               # WAIT FOR EC2 IAM CREDENTIALS
@@ -423,7 +426,8 @@ Resources:
               unzip -o \
                 /tmp/cloudmart-dashboard.zip \
                 -d /opt/cloudmart-dashboard
-                
+
+
               # ==================================================
               # CREATE PYTHON VIRTUAL ENVIRONMENT
               # ==================================================
@@ -532,6 +536,26 @@ Resources:
 
 
               # ==================================================
+              # VALIDATE DASHBOARD APPLICATION
+              # ==================================================
+
+              echo "===== Validating CloudMart Dashboard ====="
+
+              cd /opt/cloudmart-dashboard
+
+              # Load the same environment variables used by systemd
+              set +x
+              set -a
+              source /etc/cloudmart-dashboard.env
+              set +a
+              set -x
+
+              /opt/cloudmart-dashboard/venv/bin/python -m py_compile app.py
+
+              /opt/cloudmart-dashboard/venv/bin/python -c "import app; print('CloudMart dashboard import successful')"
+
+
+              # ==================================================
               # START DASHBOARD SERVICE
               # ==================================================
 
@@ -539,10 +563,42 @@ Resources:
 
               systemctl enable cloudmart-dashboard
 
-              systemctl start cloudmart-dashboard
+              systemctl start cloudmart-dashboard || true
+
+              for i in {1..12}; do
+
+                if systemctl is-active --quiet cloudmart-dashboard; then
+                  echo "CloudMart Dashboard is running."
+                  break
+                fi
+
+                echo "CloudMart Dashboard is not ready yet. Attempt $i/12"
+
+                journalctl -u cloudmart-dashboard \
+                  --no-pager \
+                  -n 30 \
+                  || true
+
+                if [ "$i" -lt 12 ]; then
+                  systemctl restart cloudmart-dashboard || true
+                  sleep 5
+                fi
+
+              done
 
 
-              sleep 5
+              if ! systemctl is-active --quiet cloudmart-dashboard; then
+
+                echo "ERROR: CloudMart Dashboard failed to start."
+
+                journalctl -u cloudmart-dashboard \
+                  --no-pager \
+                  -n 100 \
+                  || true
+
+                exit 1
+
+              fi
 
 
               systemctl --no-pager status cloudmart-dashboard
@@ -556,10 +612,38 @@ Resources:
 
               systemctl enable nginx
 
-              systemctl restart nginx
+              systemctl restart nginx || true
 
 
-              sleep 3
+              for i in {1..12}; do
+
+                if systemctl is-active --quiet nginx; then
+                  echo "Nginx is running."
+                  break
+                fi
+
+                echo "Nginx is not ready yet. Attempt $i/12"
+
+                if [ "$i" -lt 12 ]; then
+                  systemctl restart nginx || true
+                  sleep 3
+                fi
+
+              done
+
+
+              if ! systemctl is-active --quiet nginx; then
+
+                echo "ERROR: Nginx failed to start."
+
+                journalctl -u nginx \
+                  --no-pager \
+                  -n 100 \
+                  || true
+
+                exit 1
+
+              fi
 
 
               systemctl --no-pager status nginx
@@ -570,16 +654,44 @@ Resources:
               # ==================================================
 
               for i in {1..12}; do
-                if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+
+                if curl -fsS http://127.0.0.1:8000/health >/dev/null && \
+                   curl -fsS http://127.0.0.1/health >/dev/null; then
+
+                  echo "Dashboard health checks passed."
+
                   break
+
                 fi
 
-                systemctl restart cloudmart-dashboard
-                sleep 5
+
+                echo "Dashboard health check failed. Attempt $i/12"
+
+
+                if [ "$i" -lt 12 ]; then
+
+                  systemctl restart cloudmart-dashboard || true
+
+                  systemctl restart nginx || true
+
+                  sleep 5
+
+                fi
+
               done
 
+
               curl -fsS http://127.0.0.1:8000/health
+
               curl -fsS http://127.0.0.1/health
+
+
+              # ==================================================
+              # BOOTSTRAP COMPLETE MARKER
+              # ==================================================
+
+              touch /var/lib/cloudmart-dashboard/bootstrap-complete
+
 
               echo "===== CloudMart Dashboard Bootstrap Completed ====="
 
@@ -615,6 +727,7 @@ Resources:
     Properties:
 
       Name: AWS-RunShellScript
+
       Targets:
         - Key: InstanceIds
           Values:
@@ -635,10 +748,46 @@ Resources:
 
               echo "===== CloudMart Dashboard Deployment Started ====="
 
+
+              # ==================================================
+              # WAIT FOR INITIAL EC2 BOOTSTRAP
+              # ==================================================
+
               echo "Waiting for initial EC2 bootstrap..."
 
               if command -v cloud-init >/dev/null 2>&1; then
                 cloud-init status --wait || true
+              fi
+
+
+              for i in {1..60}; do
+
+                if [ -f /var/lib/cloudmart-dashboard/bootstrap-complete ]; then
+
+                  echo "Initial CloudMart dashboard bootstrap completed."
+
+                  break
+
+                fi
+
+
+                echo "Waiting for CloudMart bootstrap marker... Attempt $i/60"
+
+                sleep 5
+
+              done
+
+
+              if [ ! -f /var/lib/cloudmart-dashboard/bootstrap-complete ]; then
+
+                echo "ERROR: Initial CloudMart dashboard bootstrap did not complete."
+
+                tail -n 100 \
+                  /var/log/cloudmart-dashboard-setup.log \
+                  || true
+
+                exit 1
+
               fi
 
 
@@ -653,7 +802,7 @@ Resources:
 
 
               # ==================================================
-              # Delete & takes DASHBOARD ZIP from s3
+              # DOWNLOAD DASHBOARD PACKAGE
               # ==================================================
 
               rm -f /tmp/cloudmart-dashboard.zip
@@ -717,15 +866,34 @@ Resources:
               DB_HOST=${RdsEndpoint}
               DB_PORT=${RdsPort}
               DB_NAME=${DbName}
-              DB_USERNAME=${DBUsername}
-              DB_PASSWORD=${DBPassword}
-              ADMIN_TOKEN=${AdminToken}
+              DB_USERNAME_PARAMETER=/cloudmart/${Environment}/rds/username
+              DB_PASSWORD_PARAMETER=/cloudmart/${Environment}/rds/password
+              ADMIN_TOKEN_PARAMETER=/cloudmart/${Environment}/auth/admin-token
               FLASK_SECRET_KEY=$FLASK_SECRET_KEY
               DASHBOARD_VERSION=${DashboardVersion}
               EOF
 
 
               chmod 600 /etc/cloudmart-dashboard.env
+
+
+              # ==================================================
+              # VALIDATE UPDATED DASHBOARD
+              # ==================================================
+
+              cd /opt/cloudmart-dashboard
+
+              set -a
+              source /etc/cloudmart-dashboard.env
+              set +a
+
+
+              /opt/cloudmart-dashboard/venv/bin/python \
+                -m py_compile app.py
+
+
+              /opt/cloudmart-dashboard/venv/bin/python \
+                -c "import app; print('CloudMart dashboard import successful')"
 
 
               # ==================================================
@@ -744,17 +912,85 @@ Resources:
 
               systemctl enable cloudmart-dashboard
 
-              systemctl restart cloudmart-dashboard
+              systemctl restart cloudmart-dashboard || true
 
 
-              sleep 5
+              for i in {1..12}; do
+
+                if systemctl is-active --quiet cloudmart-dashboard; then
+
+                  echo "CloudMart Dashboard is running."
+
+                  break
+
+                fi
+
+
+                echo "CloudMart Dashboard restart not ready yet. Attempt $i/12"
+
+
+                journalctl -u cloudmart-dashboard \
+                  --no-pager \
+                  -n 30 \
+                  || true
+
+
+                if [ "$i" -lt 12 ]; then
+
+                  systemctl restart cloudmart-dashboard || true
+
+                  sleep 5
+
+                fi
+
+              done
+
+
+              if ! systemctl is-active --quiet cloudmart-dashboard; then
+
+                echo "ERROR: CloudMart Dashboard failed to restart."
+
+                journalctl -u cloudmart-dashboard \
+                  --no-pager \
+                  -n 100 \
+                  || true
+
+                exit 1
+
+              fi
 
 
               # ==================================================
               # HEALTH CHECK
               # ==================================================
 
-              curl -f http://127.0.0.1:8000/health
+              for i in {1..12}; do
+
+                if curl -fsS \
+                  http://127.0.0.1:8000/health >/dev/null; then
+
+                  echo "Dashboard health check passed."
+
+                  break
+
+                fi
+
+
+                echo "Dashboard health check failed. Attempt $i/12"
+
+
+                if [ "$i" -lt 12 ]; then
+
+                  systemctl restart cloudmart-dashboard || true
+
+                  sleep 5
+
+                fi
+
+              done
+
+
+              curl -fsS http://127.0.0.1:8000/health
 
 
               echo "===== CloudMart Dashboard Deployment Completed ====="
@@ -829,7 +1065,7 @@ Outputs:
   # ============================================================
 
   DailyReportScheduleArn:
-    Description: Daily report EventBridge rule
+    Description: CloudMart daily report EventBridge rule
 
     Value: !GetAtt DailyReportSchedule.Arn
 
