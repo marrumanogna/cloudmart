@@ -734,7 +734,7 @@ Resources:
 
       ApplyOnlyAtCronInterval: false
 
-      WaitForSuccessTimeoutSeconds: 1200
+      WaitForSuccessTimeoutSeconds: 1800
 
       Parameters:
 
