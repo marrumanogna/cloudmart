@@ -191,18 +191,27 @@ jobs:
           aws cloudformation validate-template \
             --template-body file://cloudformation/auth-stack-packaged.yaml
 
+      - name: Store Admin Token in SSM
+        run: |
+          aws ssm put-parameter \
+            --name "/cloudmart/${{ env.ENVIRONMENT }}/auth/admin-token" \
+            --value "${{ secrets.ADMIN_TOKEN }}" \
+            --type "SecureString" \
+            --overwrite \
+            --region "${{ env.AWS_REGION }}"
+
       - name: Deploy Auth Stack
         run: |
           aws cloudformation deploy \
             --template-file cloudformation/auth-stack-packaged.yaml \
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-             Environment=${{ env.ENVIRONMENT }} \
-             AdminToken="${{ secrets.ADMIN_TOKEN }}" \
-             DBUsername="${{ secrets.DB_USERNAME }}" \
-             DBPassword="${{ secrets.DB_PASSWORD }}" \
-             --capabilities CAPABILITY_NAMED_IAM \
-             --region ${{ env.AWS_REGION }}
+            Environment=${{ env.ENVIRONMENT }} \
+            AdminToken="${{ secrets.ADMIN_TOKEN }}" \
+            DBUsername="${{ secrets.DB_USERNAME }}" \
+            DBPassword="${{ secrets.DB_PASSWORD }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }}
   # ============================================================
   # API / APPLICATION
   # ============================================================

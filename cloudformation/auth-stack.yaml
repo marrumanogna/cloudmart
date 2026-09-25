@@ -7,10 +7,6 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-  
-  AdminToken:
-    Type: String
-    NoEcho: true
 
   DBUsername:
     Type: String
@@ -19,20 +15,8 @@ Parameters:
   DBPassword:
     Type: String
     NoEcho: true
-  
-  AdminTokenParameterName:
-    Type: String
-    Default: /cloudmart/dev/auth/admin-token
 
 Resources:
-
-  AdminTokenSSMParameter:
-    Type: AWS::SSM::Parameter
-
-    Properties:
-      Name: !Ref AdminTokenParameterName
-      Type: SecureString
-      Value: !Ref AdminToken
 
   AuthorizerRole:
     Type: AWS::IAM::Role
