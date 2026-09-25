@@ -865,9 +865,9 @@ Resources:
               DB_HOST=${RdsEndpoint}
               DB_PORT=${RdsPort}
               DB_NAME=${DbName}
-              DB_USERNAME_PARAMETER=/cloudmart/${Environment}/rds/username
-              DB_PASSWORD_PARAMETER=/cloudmart/${Environment}/rds/password
-              ADMIN_TOKEN_PARAMETER=/cloudmart/${Environment}/auth/admin-token
+              DB_USERNAME=${DBUsername}
+              DB_PASSWORD=${DBPassword}
+              ADMIN_TOKEN=${AdminToken}
               FLASK_SECRET_KEY=$FLASK_SECRET_KEY
               DASHBOARD_VERSION=${DashboardVersion}
               EOF
