@@ -1070,3 +1070,4 @@ Outputs:
 
     Export:
       Name: !Sub CloudMart-${Environment}-DailyReportScheduleArn
+# Fresh deployment trigger
