@@ -85,7 +85,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-
+  
       # --------------------------------------------------------
       # Get Artifacts Bucket
       # --------------------------------------------------------
@@ -139,6 +139,22 @@ jobs:
               NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
+      
+      - name: Store DB Credentials in SSM
+        run: |
+          aws ssm put-parameter \
+            --name "/cloudmart/${{ env.ENVIRONMENT }}/rds/username" \
+            --value "${{ secrets.DB_USERNAME }}" \
+            --type "SecureString" \
+            --overwrite \
+            --region "${{ env.AWS_REGION }}"
+
+          aws ssm put-parameter \
+            --name "/cloudmart/${{ env.ENVIRONMENT }}/rds/password" \
+            --value "${{ secrets.DB_PASSWORD }}" \
+            --type "SecureString" \
+            --overwrite \
+            --region "${{ env.AWS_REGION }}"
   # --------------------------------------------------------
   # Run Database Initialization Lambda
   # --------------------------------------------------------
