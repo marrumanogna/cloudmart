@@ -23,6 +23,23 @@ s3 = boto3.client(
     region_name=AWS_REGION
 )
 
+ssm = boto3.client(
+    "ssm",
+    region_name=AWS_REGION
+)
+
+
+def get_parameter(name):
+
+    response = ssm.get_parameter(
+        Name=name,
+        WithDecryption=True
+    )
+
+    return response["Parameter"]["Value"]
+
+
+
 # ============================================================
 # ADMIN AUTHENTICATION
 # ============================================================
