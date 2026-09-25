@@ -46,6 +46,30 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Grant Bootstrap OIDC Permissions
+        shell: bash
+        run: |
+          cat > oidc-bootstrap-policy.json <<'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "iam:CreateOpenIDConnectProvider",
+                  "iam:GetOpenIDConnectProvider"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+          EOF
+
+          aws iam put-role-policy \
+            --role-name CloudMart-GitHubActions-Role \
+            --policy-name CloudMartOIDCBootstrap \
+            --policy-document file://oidc-bootstrap-policy.json
+
       - name: Get AWS Account ID
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity \
