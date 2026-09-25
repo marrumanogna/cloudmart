@@ -15,30 +15,13 @@ app.config["SECRET_KEY"] = os.environ["FLASK_SECRET_KEY"]
 
 AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 REPORTS_BUCKET = os.environ["REPORTS_BUCKET"]
-ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
+
 
 
 s3 = boto3.client(
     "s3",
     region_name=AWS_REGION
 )
-
-ssm = boto3.client(
-    "ssm",
-    region_name=AWS_REGION
-)
-
-
-def get_parameter(name):
-
-    response = ssm.get_parameter(
-        Name=name,
-        WithDecryption=True
-    )
-
-    return response["Parameter"]["Value"]
-
-
 
 # ============================================================
 # ADMIN AUTHENTICATION
@@ -82,9 +65,7 @@ def login():
 
         try:
 
-            stored_token = get_parameter(
-                ADMIN_TOKEN_PARAMETER
-            )
+            stored_token = os.environ["ADMIN_TOKEN"]
 
             if hmac.compare_digest(
                 entered_token,
@@ -122,13 +103,9 @@ def get_db_connection():
         host=os.environ["DB_HOST"],
         port=int(os.environ.get("DB_PORT", "3306")),
 
-        user=get_parameter(
-            os.environ["DB_USERNAME_PARAMETER"]
-        ),
+        user=os.environ["DB_USERNAME"],
 
-        password=get_parameter(
-            os.environ["DB_PASSWORD_PARAMETER"]
-        ),
+        password=os.environ["DB_PASSWORD"],
 
         database=os.environ.get(
             "DB_NAME",
