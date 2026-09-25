@@ -133,9 +133,10 @@ jobs:
             --template-file cloudformation/data-stack-packaged.yaml \
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-            Environment=${{ env.ENVIRONMENT }} \
-            DBUsername="${{ secrets.DB_USERNAME }}" \
-            DBPassword="${{ secrets.DB_PASSWORD }}" \
+              Environment=${{ env.ENVIRONMENT }} \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+              NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
   # --------------------------------------------------------
