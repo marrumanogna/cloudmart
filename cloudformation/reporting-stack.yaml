@@ -361,12 +361,11 @@ Resources:
               # ==================================================
 
               dnf install -y \
-                python3 \
-                python3-pip \
-                nginx \
-                unzip \
-                mariadb105 \
-                curl
+              python3 \
+              python3-pip \
+              nginx \
+              unzip \
+              mariadb105
 
               # Amazon Linux 2023 includes AWS CLI v2
 
