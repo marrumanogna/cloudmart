@@ -186,6 +186,7 @@ jobs:
             --s3-bucket "$ARTIFACTS_BUCKET" \
             --output-template-file cloudformation/auth-stack-packaged.yaml \
             --region ${{ env.AWS_REGION }}
+
       - name: Validate Auth Template
         run: |
           aws cloudformation validate-template \

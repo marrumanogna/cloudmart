@@ -1,5 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
+
 Description: CloudMart Authentication Stack
 
 Parameters:
@@ -12,95 +13,138 @@ Parameters:
     Type: String
     NoEcho: true
 
+  AdminToken:
+    Type: String
+    NoEcho: true
+
   DBPassword:
     Type: String
     NoEcho: true
+
 
 Resources:
 
   AuthorizerRole:
     Type: AWS::IAM::Role
+
     Properties:
       RoleName: !Sub cloudmart-authorizer-role-${Environment}
 
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
+
         Statement:
           - Effect: Allow
+
             Principal:
               Service:
                 - lambda.amazonaws.com
+
             Action:
               - sts:AssumeRole
+
 
       Policies:
 
         - PolicyName: AuthorizerSSMAccess
+
           PolicyDocument:
             Version: '2012-10-17'
+
             Statement:
               - Effect: Allow
+
                 Action:
                   - ssm:GetParameter
+
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/admin-token
 
+
         - PolicyName: AuthorizerRdsSSMAccess
+
           PolicyDocument:
             Version: '2012-10-17'
+
             Statement:
               - Effect: Allow
+
                 Action:
                   - ssm:GetParameter
+
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
+
         - PolicyName: AuthorizerVpcAccess
+
           PolicyDocument:
             Version: '2012-10-17'
+
             Statement:
               - Effect: Allow
+
                 Action:
                   - ec2:CreateNetworkInterface
                   - ec2:DescribeNetworkInterfaces
                   - ec2:DeleteNetworkInterface
+
                 Resource: "*"
 
+
         - PolicyName: AuthorizerCloudWatchLogs
+
           PolicyDocument:
             Version: '2012-10-17'
+
             Statement:
               - Effect: Allow
+
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-authorizer-${Environment}:*
 
 
   AuthorizerFunction:
     Type: AWS::Serverless::Function
+
     Properties:
+
       FunctionName: !Sub cloudmart-authorizer-${Environment}
+
       Runtime: python3.11
+
       Handler: index.lambda_handler
+
       Role: !GetAtt AuthorizerRole.Arn
+
       Timeout: 10
+
       MemorySize: 128
 
+
       VpcConfig:
+
         SubnetIds:
           - !ImportValue
             Fn::Sub: CloudMart-${Environment}-PrivateSubnetId
+
           - !ImportValue
             Fn::Sub: CloudMart-${Environment}-PrivateSubnet2Id
+
         SecurityGroupIds:
           - !ImportValue
             Fn::Sub: CloudMart-${Environment}-LambdaSecurityGroupId
 
+
       Environment:
+
         Variables:
+
           ADMIN_TOKEN: !Ref AdminToken
 
           DB_HOST:
@@ -113,30 +157,42 @@ Resources:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
           DB_USERNAME: !Ref DBUsername
+
           DB_PASSWORD: !Ref DBPassword
+
 
       CodeUri: ../authorizer-code/
 
 
   AuthorizerLambdaPermission:
     Type: AWS::Lambda::Permission
+
     Properties:
+
       Action: lambda:InvokeFunction
+
       FunctionName: !Ref AuthorizerFunction
+
       Principal: apigateway.amazonaws.com
 
 
 Outputs:
 
   AuthorizerFunctionArn:
+
     Description: CloudMart Lambda Authorizer ARN
+
     Value: !GetAtt AuthorizerFunction.Arn
+
     Export:
       Name: !Sub CloudMart-${Environment}-AuthorizerFunctionArn
 
 
   AuthorizerFunctionInvokeArn:
+
     Description: API Gateway Lambda Authorizer invocation URI
+
     Value: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
+
     Export:
       Name: !Sub CloudMart-${Environment}-AuthorizerFunctionInvokeArn
