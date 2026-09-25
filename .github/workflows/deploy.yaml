@@ -73,9 +73,7 @@ jobs:
 
   deploy-data:
     name: Deploy Data Stack
-    needs:
-      - bootstrap-iam
-      - deploy-network
+    needs: deploy-network
     runs-on: ubuntu-latest
 
     steps:
