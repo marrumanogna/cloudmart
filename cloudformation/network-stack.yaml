@@ -13,7 +13,15 @@ Resources:
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub cloudmart-artifacts-${Environment}-${AWS::AccountId}
+      BucketName: !Join
+        - '-'
+        - - cloudmart-artifacts
+          - !Ref Environment
+          - !Select
+            - 2
+            - !Split
+              - '/'
+              - !Ref AWS::StackId
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
