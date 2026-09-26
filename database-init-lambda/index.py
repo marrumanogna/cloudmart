@@ -1,4 +1,5 @@
 import os
+import uuid
 import pymysql
 
 
@@ -68,12 +69,71 @@ def lambda_handler(event, context):
             if statement:
                 statements.append(statement)
 
+        # Execute schema statements
         for statement in statements:
             print("Executing:", statement[:100])
             cursor.execute(statement)
 
+        # ---------------------------------------------------------
+        # Add customer_token to existing customers table if missing
+        # ---------------------------------------------------------
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = %s
+              AND TABLE_NAME = 'customers'
+              AND COLUMN_NAME = 'customer_token'
+        """, (db_name,))
+
+        column_exists = cursor.fetchone()[0]
+
+        if not column_exists:
+
+            print("customer_token column is missing. Adding it...")
+
+            # Add temporarily as nullable
+            cursor.execute("""
+                ALTER TABLE customers
+                ADD COLUMN customer_token VARCHAR(255) NULL
+            """)
+
+            # Generate tokens for existing customers
+            cursor.execute("""
+                SELECT customer_id
+                FROM customers
+                WHERE customer_token IS NULL
+            """)
+
+            existing_customers = cursor.fetchall()
+
+            for row in existing_customers:
+                customer_id = row[0]
+
+                token = str(uuid.uuid4())
+
+                cursor.execute("""
+                    UPDATE customers
+                    SET customer_token = %s
+                    WHERE customer_id = %s
+                """, (token, customer_id))
+
+            # Make the column required and unique
+            cursor.execute("""
+                ALTER TABLE customers
+                MODIFY COLUMN customer_token VARCHAR(255) NOT NULL
+            """)
+
+            cursor.execute("""
+                ALTER TABLE customers
+                ADD UNIQUE KEY uq_customers_customer_token (customer_token)
+            """)
+
+            print("customer_token column added successfully.")
+
         connection.commit()
 
+        # Verify tables
         cursor.execute("SHOW TABLES")
 
         tables = [

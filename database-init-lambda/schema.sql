@@ -14,11 +14,9 @@ USE cloudmart;
 
 CREATE TABLE IF NOT EXISTS customers (
     customer_id INT AUTO_INCREMENT PRIMARY KEY,
-
     name VARCHAR(150) NOT NULL,
-
     email VARCHAR(150) NOT NULL UNIQUE,
-
+    customer_token VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
