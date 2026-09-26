@@ -16,25 +16,25 @@ Parameters:
       - dev
       - prod
 
-    DashboardVersion:
-      Type: String
-      Default: initial
+  DashboardVersion:
+    Type: String
+    Default: initial
 
-    LatestAmiId:
-      Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-      Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
 
-    DBUsername:
-      Type: String
-      NoEcho: true
+  DBUsername:
+    Type: String
+    NoEcho: true
 
-    DBPassword:
-      Type: String
-      NoEcho: true
+  DBPassword:
+    Type: String
+    NoEcho: true
 
-    AdminToken:
-      Type: String
-      NoEcho: true
+  AdminToken:
+    Type: String
+    NoEcho: true
 
 
 # ============================================================
