@@ -135,12 +135,10 @@ Resources:
   ReportsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub cloudmart-reports-${Environment}-${AWS::AccountId}
-
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+            SSEAlgorithm: AES256
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -153,13 +151,8 @@ Resources:
           Value: !Sub cloudmart-reports-${Environment}
 
 
-  # ============================================================
-  # DATABASE INIT LAMBDA IAM ROLE
-  # ============================================================
-
-    DatabaseInitLambdaRole:
+  DatabaseInitLambdaRole:
     Type: AWS::IAM::Role
-
     Properties:
       RoleName: !Sub CloudMart-DatabaseInitLambda-${Environment}
 
