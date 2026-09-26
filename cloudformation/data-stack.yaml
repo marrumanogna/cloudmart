@@ -317,60 +317,48 @@ Resources:
 Outputs:
 
   RdsEndpoint:
-
     Value:
       !GetAtt CloudMartRDS.Endpoint.Address
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-RdsEndpoint
 
 
   RdsPort:
-
     Value:
       !GetAtt CloudMartRDS.Endpoint.Port
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-RdsPort
 
 
   ReportsBucketName:
-    Type: String
     Value:
       !Ref ReportsBucket
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-ReportsBucketName
 
 
   DBName:
-
     Value:
       !Ref DBName
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-DBName
 
 
   DBUsername:
-
     Value:
       !Ref DBUsername
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-DBUsername
 
 
   DatabaseInitLambdaArn:
-
     Value:
       !GetAtt DatabaseInitLambda.Arn
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-DatabaseInitLambdaArn
