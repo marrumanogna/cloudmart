@@ -699,6 +699,9 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
+
       CodeUri: ../customer-lambda/package/
   # ============================================================
   # PRODUCT LAMBDA
