@@ -12,8 +12,14 @@ Parameters:
       - dev
       - prod
 
-  DB_USERNAME: !Ref DBUsername
-  DB_PASSWORD: !Ref DBPassword
+  Parameters:
+  DBUsername:
+    Type: String
+    NoEcho: true
+
+  DBPassword:
+    Type: String
+    NoEcho: true
 
   NotificationEmail:
     Type: String
