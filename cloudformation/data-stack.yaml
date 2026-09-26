@@ -184,7 +184,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: DatabaseInitPolicy
+        - PolicyName: !Sub DatabaseInitPolicy-${Environment}
 
           PolicyDocument:
 
@@ -283,7 +283,7 @@ Resources:
     Type: AWS::IAM::Policy
 
     Properties:
-      PolicyName: CloudMart-DatabaseInitLambdaInvoke
+      PolicyName: !Sub CloudMart-DatabaseInitLambdaInvoke-${Environment}
       Roles:
         - CloudMart-GitHubActions-Role
       PolicyDocument:
@@ -337,7 +337,7 @@ Outputs:
 
 
   ReportsBucketName:
-
+    Type: String
     Value:
       !Ref ReportsBucket
 

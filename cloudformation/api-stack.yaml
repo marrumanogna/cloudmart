@@ -51,7 +51,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: CustomerLambdaSSM
+        - PolicyName: !Sub CustomerLambdaSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -61,7 +61,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
-        - PolicyName: CustomerLambdaCloudWatch
+        - PolicyName: !Sub CustomerLambdaCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -73,7 +73,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-customer-${Environment}:*
 
-        - PolicyName: CustomerLambdaVpcAccess
+        - PolicyName: !Sub CustomerLambdaVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -105,7 +105,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: ProductLambdaSSM
+        - PolicyName: !Sub ProductLambdaSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -115,7 +115,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
-        - PolicyName: ProductLambdaEventsAndSNS
+        - PolicyName: !Sub ProductLambdaEventsAndSNS-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -132,7 +132,7 @@ Resources:
                 Resource:
                   - !Ref LowStockTopic
 
-        - PolicyName: ProductLambdaCloudWatch
+        - PolicyName: !Sub ProductLambdaCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -150,7 +150,7 @@ Resources:
                   - cloudwatch:PutMetricData
                 Resource: "*"
 
-        - PolicyName: ProductLambdaVpcAccess
+        - PolicyName: !Sub ProductLambdaVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -184,7 +184,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: OrderLambdaSSM
+        - PolicyName: !Sub OrderLambdaSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -194,7 +194,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
-        - PolicyName: OrderLambdaInvokeProcessor
+        - PolicyName: !Sub OrderLambdaInvokeProcessor-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -204,7 +204,7 @@ Resources:
                 Resource:
                   - !GetAtt OrderProcessorLambda.Arn
 
-        - PolicyName: OrderLambdaEvents
+        - PolicyName: !Sub OrderLambdaEvents-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -214,7 +214,7 @@ Resources:
                 Resource:
                   - !GetAtt CloudMartEventBus.Arn
 
-        - PolicyName: OrderLambdaCloudWatch
+        - PolicyName: !Sub OrderLambdaCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -231,7 +231,7 @@ Resources:
                   - cloudwatch:PutMetricData
                 Resource: "*"
 
-        - PolicyName: OrderLambdaVpcAccess
+        - PolicyName: !Sub OrderLambdaVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -266,7 +266,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: OrderProcessorSSM
+        - PolicyName: !Sub OrderProcessorSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -276,7 +276,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
-        - PolicyName: OrderProcessorCloudWatch
+        - PolicyName: !Sub OrderProcessorCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -292,7 +292,7 @@ Resources:
                   - cloudwatch:PutMetricData
                 Resource: "*"
 
-        - PolicyName: OrderProcessorVpcAccess
+        - PolicyName: !Sub OrderProcessorVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -304,7 +304,7 @@ Resources:
                   - ec2:DeleteNetworkInterface
                 Resource: '*'
 
-        - PolicyName: OrderProcessorSQS
+        - PolicyName: !Sub OrderProcessorSQS-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -313,7 +313,7 @@ Resources:
                   - sqs:SendMessage
                 Resource: !GetAtt FailedOrdersQueue.Arn
 
-        - PolicyName: OrderProcessorEvents
+        - PolicyName: !Sub OrderProcessorEvents-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -348,7 +348,7 @@ Resources:
         # --------------------------------------------------------
         # SSM - Read RDS credentials
         # --------------------------------------------------------
-        - PolicyName: ReportLambdaSSM
+        - PolicyName: !Sub ReportLambdaSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -361,7 +361,7 @@ Resources:
         # --------------------------------------------------------
         # S3 - Write daily reports
         # --------------------------------------------------------
-        - PolicyName: ReportLambdaS3
+        - PolicyName: !Sub ReportLambdaS3-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -378,7 +378,7 @@ Resources:
         # --------------------------------------------------------
         # CloudWatch Logs + Metrics
         # --------------------------------------------------------
-        - PolicyName: ReportLambdaCloudWatch
+        - PolicyName: !Sub ReportLambdaCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -399,7 +399,7 @@ Resources:
         # --------------------------------------------------------
         # VPC access
         # --------------------------------------------------------
-        - PolicyName: ReportLambdaVpcAccess
+        - PolicyName: !Sub ReportLambdaVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:

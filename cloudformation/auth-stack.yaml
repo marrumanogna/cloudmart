@@ -8,6 +8,9 @@ Parameters:
   Environment:
     Type: String
     Default: dev
+    AllowedValues:
+      - dev
+      - prod
 
   DBUsername:
     Type: String
@@ -46,7 +49,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: AuthorizerSSMAccess
+        - PolicyName: !Sub AuthorizerSSMAccess-${Environment}
 
           PolicyDocument:
             Version: '2012-10-17'
@@ -61,7 +64,7 @@ Resources:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/auth/admin-token
 
 
-        - PolicyName: AuthorizerRdsSSMAccess
+        - PolicyName: !Sub AuthorizerRdsSSMAccess-${Environment}
 
           PolicyDocument:
             Version: '2012-10-17'
@@ -75,8 +78,7 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
-
-        - PolicyName: AuthorizerVpcAccess
+        - PolicyName: !Sub AuthorizerVpcAccess-${Environment}
 
           PolicyDocument:
             Version: '2012-10-17'
@@ -91,9 +93,7 @@ Resources:
 
                 Resource: "*"
 
-
-        - PolicyName: AuthorizerCloudWatchLogs
-
+        - PolicyName: !Sub AuthorizerCloudWatchLogs-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
 
@@ -107,7 +107,6 @@ Resources:
 
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-authorizer-${Environment}:*
-
 
   AuthorizerFunction:
     Type: AWS::Serverless::Function

@@ -7,6 +7,9 @@ Parameters:
   Environment:
     Type: String
     Default: dev
+    AllowedValues:
+      - dev
+      - prod
 
   AlarmEmail:
     Type: String
@@ -132,7 +135,7 @@ Resources:
   CloudMartOperationsDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
-      DashboardName: cloudmart-operations
+      DashboardName: !Sub cloudmart-operations-${Environment}
 
       DashboardBody: !Sub |
         {

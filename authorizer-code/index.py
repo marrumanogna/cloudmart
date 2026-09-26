@@ -94,7 +94,7 @@ def lambda_handler(event, context):
         provided_token = provided_token[7:].strip()
 
     try:
-        admin_token = ADMIN_TOKEN
+        admin_token = os.environ["ADMIN_TOKEN"]
 
         if provided_token == admin_token:
             print("Admin authenticated")

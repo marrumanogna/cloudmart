@@ -9,9 +9,12 @@ Description: CloudMart Reporting and EC2 Dashboard Stack
 
 Parameters:
 
-    Environment:
-      Type: String
-      Default: dev
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
 
     DashboardVersion:
       Type: String
@@ -126,7 +129,7 @@ Resources:
         # Upload bootstrap log to S3
         # ------------------------------------------------------
 
-        - PolicyName: DashboardBootstrapLogs
+        - PolicyName: !Sub DashboardBootstrapLogs-${Environment}
 
           PolicyDocument:
             Version: '2012-10-17'
@@ -149,7 +152,7 @@ Resources:
         # Read dashboard package from S3
         # ------------------------------------------------------
 
-        - PolicyName: DashboardArtifactsRead
+        - PolicyName: !Sub DashboardArtifactsRead-${Environment}
 
           PolicyDocument:
             Version: '2012-10-17'
@@ -172,7 +175,7 @@ Resources:
         # Read generated reports from S3
         # ------------------------------------------------------
 
-        - PolicyName: DashboardReportsRead
+        - PolicyName: !Sub DashboardReportsRead-${Environment}
 
           PolicyDocument:
             Version: '2012-10-17'
@@ -207,7 +210,7 @@ Resources:
         # Read RDS credentials and Admin Token from SSM
         # ------------------------------------------------------
 
-        - PolicyName: DashboardSSMRead
+        - PolicyName: !Sub DashboardSSMRead-${Environment}
 
           PolicyDocument:
             Version: '2012-10-17'
