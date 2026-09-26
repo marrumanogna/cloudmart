@@ -12,13 +12,8 @@ Parameters:
       - dev
       - prod
 
-  DBUsername:
-    Type: String
-    NoEcho: true
-
-  DBPassword:
-    Type: String
-    NoEcho: true
+  DB_USERNAME: !Ref DBUsername
+  DB_PASSWORD: !Ref DBPassword
 
   NotificationEmail:
     Type: String
@@ -688,19 +683,18 @@ Resources:
 
       Environment:
         Variables:
-          ENVIRONMENT: !Ref Environment
+          Environment:
+            Variables:
+              ENVIRONMENT: !Ref Environment
 
-          DB_HOST:
-            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
+              DB_HOST:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
 
-          DB_PORT:
-            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
+              DB_PORT:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
 
-          DB_NAME:
-            Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
-
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+              DB_NAME:
+                Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
       CodeUri: ../customer-lambda/package/
   # ============================================================
@@ -781,8 +775,9 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
+
           ORDER_PROCESSOR_FUNCTION: !Ref OrderProcessorLambda
           EVENT_BUS_NAME: !Ref CloudMartEventBus
 
@@ -824,8 +819,8 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
           FAILED_ORDERS_QUEUE_URL: !Ref FailedOrdersQueue
           EVENT_BUS_NAME: !Ref CloudMartEventBus
@@ -871,11 +866,8 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER:
-            !Sub /cloudmart/${Environment}/rds/username
-
-          DB_PASSWORD_PARAMETER:
-            !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
       CodeUri: ../report-lambda-package/
   # ============================================================
@@ -937,7 +929,6 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-
         Uri:
           Fn::Sub:
             - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
