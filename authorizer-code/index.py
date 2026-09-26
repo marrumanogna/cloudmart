@@ -147,7 +147,7 @@ def lambda_handler(event, context):
             return generate_policy(
                 f"cloudmart-customer-{customer_id}",
                 "Allow",
-                method_arn,
+                policy_resource,
                 "CUSTOMER",
                 customer_id
             )

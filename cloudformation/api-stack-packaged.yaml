@@ -1,0 +1,1270 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: CloudMart API and Application Stack
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - prod
+  DBUsername:
+    Type: String
+    NoEcho: true
+  DBPassword:
+    Type: String
+    NoEcho: true
+  NotificationEmail:
+    Type: String
+Resources:
+  FailedOrdersQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:
+        Fn::Sub: cloudmart-failed-orders-${Environment}
+  CustomerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: cloudmart-customer-lambda-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName:
+          Fn::Sub: CustomerLambdaSSM-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ssm:GetParameter
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+      - PolicyName:
+          Fn::Sub: CustomerLambdaCloudWatch-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-customer-${Environment}:*
+      - PolicyName:
+          Fn::Sub: CustomerLambdaVpcAccess-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DescribeSubnets
+            - ec2:DeleteNetworkInterface
+            Resource: '*'
+  ProductLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: cloudmart-product-lambda-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName:
+          Fn::Sub: ProductLambdaSSM-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ssm:GetParameter
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+      - PolicyName:
+          Fn::Sub: ProductLambdaEventsAndSNS-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - events:PutEvents
+            Resource:
+            - Fn::GetAtt:
+              - CloudMartEventBus
+              - Arn
+          - Effect: Allow
+            Action:
+            - sns:Publish
+            Resource:
+            - Ref: LowStockTopic
+      - PolicyName:
+          Fn::Sub: ProductLambdaCloudWatch-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-product-${Environment}:*
+          - Effect: Allow
+            Action:
+            - cloudwatch:PutMetricData
+            Resource: '*'
+      - PolicyName:
+          Fn::Sub: ProductLambdaVpcAccess-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DescribeSubnets
+            - ec2:DeleteNetworkInterface
+            Resource: '*'
+  OrderLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: cloudmart-order-lambda-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName:
+          Fn::Sub: OrderLambdaSSM-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ssm:GetParameter
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+      - PolicyName:
+          Fn::Sub: OrderLambdaInvokeProcessor-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            Resource:
+            - Fn::GetAtt:
+              - OrderProcessorLambda
+              - Arn
+      - PolicyName:
+          Fn::Sub: OrderLambdaEvents-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - events:PutEvents
+            Resource:
+            - Fn::GetAtt:
+              - CloudMartEventBus
+              - Arn
+      - PolicyName:
+          Fn::Sub: OrderLambdaCloudWatch-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-order-${Environment}:*
+          - Effect: Allow
+            Action:
+            - cloudwatch:PutMetricData
+            Resource: '*'
+      - PolicyName:
+          Fn::Sub: OrderLambdaVpcAccess-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DescribeSubnets
+            - ec2:DeleteNetworkInterface
+            Resource: '*'
+  OrderProcessorLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: cloudmart-order-processor-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName:
+          Fn::Sub: OrderProcessorSSM-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ssm:GetParameter
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+      - PolicyName:
+          Fn::Sub: OrderProcessorCloudWatch-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-order-processor-${Environment}:*
+          - Effect: Allow
+            Action:
+            - cloudwatch:PutMetricData
+            Resource: '*'
+      - PolicyName:
+          Fn::Sub: OrderProcessorVpcAccess-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DescribeSubnets
+            - ec2:DeleteNetworkInterface
+            Resource: '*'
+      - PolicyName:
+          Fn::Sub: OrderProcessorSQS-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - sqs:SendMessage
+            Resource:
+              Fn::GetAtt:
+              - FailedOrdersQueue
+              - Arn
+      - PolicyName:
+          Fn::Sub: OrderProcessorEvents-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - events:PutEvents
+            Resource:
+            - Fn::GetAtt:
+              - CloudMartEventBus
+              - Arn
+  ReportLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: cloudmart-report-lambda-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName:
+          Fn::Sub: ReportLambdaSSM-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ssm:GetParameter
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+      - PolicyName:
+          Fn::Sub: ReportLambdaS3-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            - s3:GetObject
+            Resource:
+            - Fn::Sub:
+              - arn:${AWS::Partition}:s3:::${Bucket}/reports/*
+              - Bucket:
+                  Fn::ImportValue:
+                    Fn::Sub: CloudMart-${Environment}-ReportsBucketName
+      - PolicyName:
+          Fn::Sub: ReportLambdaCloudWatch-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource:
+            - Fn::Sub: 
+                arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-report-${Environment}:*
+          - Effect: Allow
+            Action:
+            - cloudwatch:PutMetricData
+            Resource: '*'
+      - PolicyName:
+          Fn::Sub: ReportLambdaVpcAccess-${Environment}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DescribeSubnets
+            - ec2:DeleteNetworkInterface
+            Resource: '*'
+  CloudMartEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name:
+        Fn::Sub: cloudmart-${Environment}-event-bus
+  LowStockTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: cloudmart-low-stock-${Environment}
+  LowStockSubscriptionV3:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint:
+        Ref: NotificationEmail
+      TopicArn:
+        Ref: LowStockTopic
+  OrderConfirmedTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: cloudmart-order-confirmed-${Environment}
+  OrderConfirmedEmailSubscriptionV3:
+    Type: AWS::SNS::Subscription
+    DeletionPolicy: Delete
+    Properties:
+      Protocol: email
+      Endpoint:
+        Ref: NotificationEmail
+      TopicArn:
+        Ref: OrderConfirmedTopic
+  InventoryChangeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name:
+        Fn::Sub: cloudmart-inventory-change-${Environment}
+      EventBusName:
+        Ref: CloudMartEventBus
+      EventPattern:
+        source:
+        - cloudmart.product
+        detail-type:
+        - Inventory Change
+      Targets:
+      - Arn:
+          Ref: LowStockTopic
+        Id: LowStockSNSTarget
+        InputTransformer:
+          InputPathsMap:
+            product_id: $.detail.product_id
+            product_name: $.detail.product_name
+            stock_quantity: $.detail.stock_quantity
+          InputTemplate: '"LOW STOCK ALERT - CLOUDMART | Product ID: <product_id>
+            | Product: <product_name> | Remaining Stock: <stock_quantity> | Please
+            restock this product."'
+  LowStockTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+      - Fn::GetAtt:
+        - LowStockTopic
+        - TopicArn
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: events.amazonaws.com
+          Action:
+          - sns:Publish
+          Resource:
+            Fn::GetAtt:
+            - LowStockTopic
+            - TopicArn
+          Condition:
+            ArnEquals:
+              aws:SourceArn:
+                Fn::GetAtt:
+                - InventoryChangeRule
+                - Arn
+  OrderPlacedTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: cloudmart-order-placed-${Environment}
+  OrderPlacedEmailSubscriptionV3:
+    Type: AWS::SNS::Subscription
+    DeletionPolicy: Delete
+    Properties:
+      Protocol: email
+      Endpoint:
+        Ref: NotificationEmail
+      TopicArn:
+        Ref: OrderPlacedTopic
+  OrderPlacedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name:
+        Fn::Sub: cloudmart-order-placed-${Environment}
+      EventBusName:
+        Ref: CloudMartEventBus
+      EventPattern:
+        source:
+        - cloudmart.order
+        detail-type:
+        - OrderPlaced
+      Targets:
+      - Arn:
+          Ref: OrderPlacedTopic
+        Id: OrderPlacedSNSTarget
+        InputTransformer:
+          InputPathsMap:
+            order_id: $.detail.order_id
+            customer_id: $.detail.customer_id
+          InputTemplate: '"ORDER PLACED - CLOUDMART | Order ID: <order_id> | Customer
+            ID: <customer_id> | Status: PLACED | Your order is being processed."'
+  OrderPlacedTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+      - Fn::GetAtt:
+        - OrderPlacedTopic
+        - TopicArn
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: events.amazonaws.com
+          Action: sns:Publish
+          Resource:
+            Fn::GetAtt:
+            - OrderPlacedTopic
+            - TopicArn
+          Condition:
+            ArnEquals:
+              aws:SourceArn:
+                Fn::GetAtt:
+                - OrderPlacedRule
+                - Arn
+  OrderConfirmedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name:
+        Fn::Sub: cloudmart-order-confirmed-${Environment}
+      EventBusName:
+        Ref: CloudMartEventBus
+      EventPattern:
+        source:
+        - cloudmart.order
+        detail-type:
+        - OrderConfirmed
+      Targets:
+      - Arn:
+          Ref: OrderConfirmedTopic
+        Id: OrderConfirmedSNSTarget
+        InputTransformer:
+          InputPathsMap:
+            order_id: $.detail.order_id
+            customer_id: $.detail.customer_id
+            total_amount: $.detail.total_amount
+            status: $.detail.status
+          InputTemplate: '"ORDER CONFIRMED - CLOUDMART | Order ID: <order_id> | Customer
+            ID: <customer_id> | Total Amount: ₹<total_amount> | Status: <status>
+            | Your order has been confirmed."'
+  OrderConfirmedTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+      - Ref: OrderConfirmedTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: events.amazonaws.com
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: OrderConfirmedTopic
+          Condition:
+            ArnEquals:
+              aws:SourceArn:
+                Fn::GetAtt:
+                - OrderConfirmedRule
+                - Arn
+  OrderFailedTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: cloudmart-order-failed-${Environment}
+  OrderFailedEmailSubscriptionV3:
+    Type: AWS::SNS::Subscription
+    DeletionPolicy: Delete
+    Properties:
+      Protocol: email
+      Endpoint:
+        Ref: NotificationEmail
+      TopicArn:
+        Ref: OrderFailedTopic
+  OrderFailedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name:
+        Fn::Sub: cloudmart-order-failed-${Environment}
+      EventBusName:
+        Ref: CloudMartEventBus
+      EventPattern:
+        source:
+        - cloudmart.order
+        detail-type:
+        - OrderFailed
+      Targets:
+      - Arn:
+          Ref: OrderFailedTopic
+        Id: OrderFailedSNSTarget
+        InputTransformer:
+          InputPathsMap:
+            order_id: $.detail.order_id
+            customer_id: $.detail.customer_id
+            reason: $.detail.reason
+          InputTemplate: '"ORDER FAILED - CLOUDMART | Order ID: <order_id> | Customer
+            ID: <customer_id> | Reason: <reason> | Please try again or choose another
+            product."'
+  OrderFailedTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+      - Fn::GetAtt:
+        - OrderFailedTopic
+        - TopicArn
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: events.amazonaws.com
+          Action:
+          - sns:Publish
+          Resource:
+            Fn::GetAtt:
+            - OrderFailedTopic
+            - TopicArn
+          Condition:
+            ArnEquals:
+              aws:SourceArn:
+                Fn::GetAtt:
+                - OrderFailedRule
+                - Arn
+  CustomerLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: cloudmart-customer-${Environment}
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - CustomerLambdaRole
+        - Arn
+      Timeout: 15
+      MemorySize: 256
+      VpcConfig:
+        SubnetIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnetId
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnet2Id
+        SecurityGroupIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-LambdaSecurityGroupId
+      Environment:
+        Variables:
+          ENVIRONMENT:
+            Ref: Environment
+          DB_HOST:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsEndpoint
+          DB_PORT:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsPort
+          DB_NAME:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-DBName
+      CodeUri: 
+        s3://cloudmart-network-dev-artifactsbucket-ato3qcofpxbs/ade66f6f5c91726d846a624a6b8d10ba
+  ProductLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: cloudmart-product-${Environment}
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - ProductLambdaRole
+        - Arn
+      Timeout: 15
+      MemorySize: 256
+      VpcConfig:
+        SubnetIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnetId
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnet2Id
+        SecurityGroupIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-LambdaSecurityGroupId
+      Environment:
+        Variables:
+          ENVIRONMENT:
+            Ref: Environment
+          DB_HOST:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsEndpoint
+          DB_PORT:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsPort
+          DB_NAME:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-DBName
+          DB_USERNAME:
+            Ref: DBUsername
+          DB_PASSWORD:
+            Ref: DBPassword
+          EVENT_BUS_NAME:
+            Ref: CloudMartEventBus
+          LOW_STOCK_TOPIC_ARN:
+            Ref: LowStockTopic
+      CodeUri: 
+        s3://cloudmart-network-dev-artifactsbucket-ato3qcofpxbs/f8cfc8476f1bf09fb33635a48b79b2ef
+  OrderLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: cloudmart-order-${Environment}
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - OrderLambdaRole
+        - Arn
+      Timeout: 60
+      MemorySize: 256
+      VpcConfig:
+        SubnetIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnetId
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnet2Id
+        SecurityGroupIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-LambdaSecurityGroupId
+      Environment:
+        Variables:
+          ENVIRONMENT:
+            Ref: Environment
+          DB_HOST:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsEndpoint
+          DB_PORT:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsPort
+          DB_NAME:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-DBName
+          DB_USERNAME:
+            Ref: DBUsername
+          DB_PASSWORD:
+            Ref: DBPassword
+          ORDER_PROCESSOR_FUNCTION:
+            Ref: OrderProcessorLambda
+          EVENT_BUS_NAME:
+            Ref: CloudMartEventBus
+      CodeUri: 
+        s3://cloudmart-network-dev-artifactsbucket-ato3qcofpxbs/a920430e90db82e933220475c93324df
+  OrderProcessorLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: cloudmart-order-processor-${Environment}
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - OrderProcessorLambdaRole
+        - Arn
+      Timeout: 30
+      MemorySize: 256
+      VpcConfig:
+        SubnetIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnetId
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnet2Id
+        SecurityGroupIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-LambdaSecurityGroupId
+      Environment:
+        Variables:
+          ENVIRONMENT:
+            Ref: Environment
+          DB_HOST:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsEndpoint
+          DB_PORT:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsPort
+          DB_NAME:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-DBName
+          DB_USERNAME:
+            Ref: DBUsername
+          DB_PASSWORD:
+            Ref: DBPassword
+          FAILED_ORDERS_QUEUE_URL:
+            Ref: FailedOrdersQueue
+          EVENT_BUS_NAME:
+            Ref: CloudMartEventBus
+      CodeUri: 
+        s3://cloudmart-network-dev-artifactsbucket-ato3qcofpxbs/bd7c34ce9d8d534607bffa00003fc4ba
+  ReportLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: cloudmart-report-${Environment}
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - ReportLambdaRole
+        - Arn
+      Timeout: 60
+      MemorySize: 256
+      VpcConfig:
+        SubnetIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnetId
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-PrivateSubnet2Id
+        SecurityGroupIds:
+        - Fn::ImportValue:
+            Fn::Sub: CloudMart-${Environment}-LambdaSecurityGroupId
+      Environment:
+        Variables:
+          ENVIRONMENT:
+            Ref: Environment
+          REPORTS_BUCKET:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-ReportsBucketName
+          DB_HOST:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsEndpoint
+          DB_PORT:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-RdsPort
+          DB_NAME:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-DBName
+          DB_USERNAME:
+            Ref: DBUsername
+          DB_PASSWORD:
+            Ref: DBPassword
+      CodeUri: 
+        s3://cloudmart-network-dev-artifactsbucket-ato3qcofpxbs/6cd9cf67782baf43ce9dd25e655ec7d3
+  CloudMartApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name:
+        Fn::Sub: cloudmart-api-${Environment}
+      Description: CloudMart REST API
+      EndpointConfiguration:
+        Types:
+        - REGIONAL
+  CloudMartAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name:
+        Fn::Sub: cloudmart-authorizer-${Environment}
+      RestApiId:
+        Ref: CloudMartApi
+      Type: TOKEN
+      IdentitySource: method.request.header.Authorization
+      AuthorizerResultTtlInSeconds: 300
+      AuthorizerUri:
+        Fn::Sub:
+        - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerArn}/invocations
+        - AuthorizerArn:
+            Fn::ImportValue:
+              Fn::Sub: CloudMart-${Environment}-AuthorizerFunctionArn
+  ProductsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ParentId:
+        Fn::GetAtt:
+        - CloudMartApi
+        - RootResourceId
+      PathPart: products
+  ProductsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: ProductsResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - ProductLambda
+              - Arn
+  ProductsPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: ProductsResource
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - ProductLambda
+              - Arn
+  ProductIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ParentId:
+        Ref: ProductsResource
+      PathPart: '{id}'
+  ProductIdGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: ProductIdResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      RequestParameters:
+        method.request.path.id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - ProductLambda
+              - Arn
+  ProductIdPutMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: ProductIdResource
+      HttpMethod: PUT
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      RequestParameters:
+        method.request.path.id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - ProductLambda
+              - Arn
+  ProductIdDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: ProductIdResource
+      HttpMethod: DELETE
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      RequestParameters:
+        method.request.path.id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - ProductLambda
+              - Arn
+  OrdersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ParentId:
+        Fn::GetAtt:
+        - CloudMartApi
+        - RootResourceId
+      PathPart: orders
+  OrdersGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: OrdersResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - OrderLambda
+              - Arn
+  OrderIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ParentId:
+        Ref: OrdersResource
+      PathPart: '{order_id}'
+  OrderIdGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: OrderIdResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      RequestParameters:
+        method.request.path.order_id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - OrderLambda
+              - Arn
+  OrderIdPatchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: OrderIdResource
+      HttpMethod: PATCH
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      RequestParameters:
+        method.request.path.order_id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - OrderLambda
+              - Arn
+  OrdersPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: OrdersResource
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: CloudMartAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - OrderLambda
+              - Arn
+  CustomersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ParentId:
+        Fn::GetAtt:
+        - CloudMartApi
+        - RootResourceId
+      PathPart: customers
+  CustomersPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      ResourceId:
+        Ref: CustomersResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+          - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
+          - FunctionArn:
+              Fn::GetAtt:
+              - CustomerLambda
+              - Arn
+  CustomerLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: CustomerLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: 
+          arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${CloudMartApi}/*/*
+  ProductLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: ProductLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: 
+          arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${CloudMartApi}/*/*
+  OrderLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: OrderLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: 
+          arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${CloudMartApi}/*/*
+  CloudMartApiDeploymentV3:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+    - ProductsGetMethod
+    - ProductsPostMethod
+    - ProductIdGetMethod
+    - ProductIdPutMethod
+    - ProductIdDeleteMethod
+    - OrdersGetMethod
+    - OrderIdGetMethod
+    - OrderIdPatchMethod
+    - OrdersPostMethod
+    - CustomersPostMethod
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      Description:
+        Fn::Sub: CloudMart API deployment for ${Environment} v2
+  CloudMartApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId:
+        Ref: CloudMartApi
+      DeploymentId:
+        Ref: CloudMartApiDeploymentV3
+      StageName:
+        Ref: Environment
+      Description:
+        Fn::Sub: CloudMart ${Environment} API stage
+Outputs:
+  ApiId:
+    Description: CloudMart API Gateway ID
+    Value:
+      Ref: CloudMartApi
+    Export:
+      Name:
+        Fn::Sub: CloudMart-${Environment}-ApiId
+  ApiInvokeUrl:
+    Description: CloudMart API invoke URL
+    Value:
+      Fn::Sub: 
+        https://${CloudMartApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}
+  ProductLambdaArn:
+    Description: Product Lambda ARN
+    Value:
+      Fn::GetAtt:
+      - ProductLambda
+      - Arn
+    Export:
+      Name:
+        Fn::Sub: CloudMart-${Environment}-ProductLambdaArn
+  OrderLambdaArn:
+    Description: Order Lambda ARN
+    Value:
+      Fn::GetAtt:
+      - OrderLambda
+      - Arn
+    Export:
+      Name:
+        Fn::Sub: CloudMart-${Environment}-OrderLambdaArn
+  OrderProcessorLambdaArn:
+    Description: Order Processor Lambda ARN
+    Value:
+      Fn::GetAtt:
+      - OrderProcessorLambda
+      - Arn
+    Export:
+      Name:
+        Fn::Sub: CloudMart-${Environment}-OrderProcessorLambdaArn
+  ReportLambdaArn:
+    Description: Report Lambda ARN
+    Value:
+      Fn::GetAtt:
+      - ReportLambda
+      - Arn
+    Export:
+      Name:
+        Fn::Sub: CloudMart-${Environment}-ReportLambdaArn
+  ProductLambdaRoleArn:
+    Description: Product Lambda IAM role ARN
+    Value:
+      Fn::GetAtt:
+      - ProductLambdaRole
+      - Arn
+  OrderLambdaRoleArn:
+    Description: Order Lambda IAM role ARN
+    Value:
+      Fn::GetAtt:
+      - OrderLambdaRole
+      - Arn
+  OrderProcessorLambdaRoleArn:
+    Description: Order Processor Lambda IAM role ARN
+    Value:
+      Fn::GetAtt:
+      - OrderProcessorLambdaRole
+      - Arn
+  ReportLambdaRoleArn:
+    Description: Report Lambda IAM role ARN
+    Value:
+      Fn::GetAtt:
+      - ReportLambdaRole
+      - Arn
+  EventBusName:
+    Description: CloudMart EventBridge bus
+    Value:
+      Ref: CloudMartEventBus
+  LowStockTopicArn:
+    Description: CloudMart low-stock SNS topic
+    Value:
+      Ref: LowStockTopic
