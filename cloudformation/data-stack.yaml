@@ -157,55 +157,45 @@ Resources:
   # DATABASE INIT LAMBDA IAM ROLE
   # ============================================================
 
-  DatabaseInitLambdaRole:
+    DatabaseInitLambdaRole:
     Type: AWS::IAM::Role
 
     Properties:
-
       RoleName: !Sub CloudMart-DatabaseInitLambda-${Environment}
 
       AssumeRolePolicyDocument:
-
         Version: '2012-10-17'
-
         Statement:
-
           - Effect: Allow
-
             Principal:
               Service:
                 - lambda.amazonaws.com
-
             Action:
               - sts:AssumeRole
 
       Policies:
-              # ------------------------------------------------
-              # CLOUDWATCH LOGS
-              # ------------------------------------------------
-
+        - PolicyName: !Sub DatabaseInitCloudWatch-${Environment}
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
               - Effect: Allow
-
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/CloudMart-DatabaseInit-${Environment}:*
-              # ------------------------------------------------
-              # VPC NETWORK INTERFACES
-              # ------------------------------------------------
 
+        - PolicyName: !Sub DatabaseInitVpcAccess-${Environment}
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
               - Effect: Allow
-
                 Action:
                   - ec2:CreateNetworkInterface
                   - ec2:DescribeNetworkInterfaces
                   - ec2:DeleteNetworkInterface
-
                 Resource: "*"
-
 
   # ============================================================
   # DATABASE INIT LAMBDA
