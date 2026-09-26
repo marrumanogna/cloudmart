@@ -1,7 +1,7 @@
 import os
 import uuid
 import pymysql
-
+import hashlib
 
 def lambda_handler(event, context):
 
@@ -112,11 +112,15 @@ def lambda_handler(event, context):
 
                 token = str(uuid.uuid4())
 
+                token_hash = hashlib.sha256(
+                    token.encode("utf-8")
+                ).hexdigest()
+
                 cursor.execute("""
                     UPDATE customers
                     SET customer_token = %s
                     WHERE customer_id = %s
-                """, (token, customer_id))
+                """, (token_hash, customer_id))
 
             # Make the column required and unique
             cursor.execute("""

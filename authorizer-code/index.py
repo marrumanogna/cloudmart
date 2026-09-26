@@ -1,5 +1,7 @@
 import os
+import hashlib
 import pymysql
+
 
 DB_HOST = os.environ["DB_HOST"]
 DB_PORT = int(os.environ["DB_PORT"])
@@ -7,6 +9,11 @@ DB_NAME = os.environ["DB_NAME"]
 
 
 def get_customer_by_token(customer_token):
+
+    customer_token_hash = hashlib.sha256(
+        customer_token.encode("utf-8")
+    ).hexdigest()
+
     username = os.environ["DB_USERNAME"]
     password = os.environ["DB_PASSWORD"]
     admin_token = os.environ["ADMIN_TOKEN"]
@@ -30,7 +37,7 @@ def get_customer_by_token(customer_token):
                 WHERE customer_token = %s
                 LIMIT 1
                 """,
-                (customer_token,)
+                (customer_token_hash,)
             )
 
             return cursor.fetchone()

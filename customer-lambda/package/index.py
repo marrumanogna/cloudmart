@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 import pymysql
+import hashlib
 
 DB_HOST = os.environ["DB_HOST"]
 DB_PORT = int(os.environ["DB_PORT"])
@@ -42,12 +43,16 @@ def lambda_handler(event, context):
 
                 customer_token = str(uuid.uuid4())
 
+                customer_token_hash = hashlib.sha256(
+                    customer_token.encode("utf-8")
+                ).hexdigest()
+
                 cursor.execute(
                     """
                     INSERT INTO customers (name, email, customer_token)
                     VALUES (%s, %s, %s)
                     """,
-                    (name, email, customer_token)
+                    (name, email, customer_token_hash)
                 )
 
                 customer_id = cursor.lastrowid
