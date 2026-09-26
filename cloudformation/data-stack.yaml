@@ -100,7 +100,6 @@ Resources:
 
   RdsHostParameter:
     Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
     Properties:
       Name: !Sub /cloudmart/${Environment}/rds/host
       Type: String
@@ -111,7 +110,6 @@ Resources:
 
   RdsPortParameter:
     Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
     Properties:
       Name: !Sub /cloudmart/${Environment}/rds/port
       Type: String
@@ -122,7 +120,6 @@ Resources:
 
   RdsDbNameParameter:
     Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
     Properties:
       Name: !Sub /cloudmart/${Environment}/rds/db-name
       Type: String
@@ -138,6 +135,7 @@ Resources:
   ReportsBucket:
     Type: AWS::S3::Bucket
     Properties:
+      BucketName: !Sub cloudmart-reports-${Environment}-${AWS::AccountId}
 
       BucketEncryption:
         ServerSideEncryptionConfiguration:
@@ -181,28 +179,7 @@ Resources:
             Action:
               - sts:AssumeRole
 
-
       Policies:
-
-        - PolicyName: !Sub DatabaseInitPolicy-${Environment}
-
-          PolicyDocument:
-
-            Version: '2012-10-17'
-
-            Statement:
- 
-              # ------------------------------------------------
-              # SSM
-              # ------------------------------------------------
-
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
-                    - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-               
-              
               # ------------------------------------------------
               # CLOUDWATCH LOGS
               # ------------------------------------------------
@@ -216,8 +193,6 @@ Resources:
 
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/CloudMart-DatabaseInit-${Environment}:*
-
-
               # ------------------------------------------------
               # VPC NETWORK INTERFACES
               # ------------------------------------------------

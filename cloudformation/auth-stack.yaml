@@ -46,22 +46,7 @@ Resources:
             Action:
               - sts:AssumeRole
 
-
       Policies:
-
-        - PolicyName: !Sub AuthorizerRdsSSMAccess-${Environment}
-
-          PolicyDocument:
-            Version: '2012-10-17'
-
-            Statement:
-              - Effect: Allow
-
-                Action:
-                  - ssm:GetParameter
-
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
 
         - PolicyName: !Sub AuthorizerVpcAccess-${Environment}
 

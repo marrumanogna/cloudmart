@@ -92,6 +92,7 @@ Resources:
     Type: AWS::IAM::Role
 
     Properties:
+      RoleName: !Sub cloudmart-dashboard-role-${Environment}
 
       # --------------------------------------------------------
       # EC2 assumes this role
@@ -170,7 +171,6 @@ Resources:
                     - Bucket:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
 
-
         # ------------------------------------------------------
         # Read generated reports from S3
         # ------------------------------------------------------
@@ -204,28 +204,6 @@ Resources:
                     - arn:${AWS::Partition}:s3:::${Bucket}/reports/*
                     - Bucket:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
-
-
-        # ------------------------------------------------------
-        # Read RDS credentials and Admin Token from SSM
-        # ------------------------------------------------------
-
-        - PolicyName: !Sub DashboardSSMRead-${Environment}
-
-          PolicyDocument:
-            Version: '2012-10-17'
-
-            Statement:
-
-              - Effect: Allow
-
-                Action:
-                  - ssm:GetParameter
-
-                Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-
-
   # ============================================================
   # EC2 INSTANCE PROFILE
   # ============================================================
