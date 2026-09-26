@@ -12,7 +12,6 @@ Parameters:
       - dev
       - prod
 
-  Parameters:
   DBUsername:
     Type: String
     NoEcho: true
