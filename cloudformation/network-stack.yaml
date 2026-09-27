@@ -9,9 +9,9 @@ Parameters:
       - dev
       - prod
 
-Resources:
   ArtifactsBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Join
         - '-'
