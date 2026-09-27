@@ -2,6 +2,7 @@ import os
 import uuid
 import pymysql
 import hashlib
+import re
 
 def lambda_handler(event, context):
 
@@ -92,48 +93,68 @@ def lambda_handler(event, context):
 
             print("customer_token column is missing. Adding it...")
 
-            # Add temporarily as nullable
             cursor.execute("""
                 ALTER TABLE customers
                 ADD COLUMN customer_token VARCHAR(255) NULL
             """)
 
-            # Generate tokens for existing customers
+            # Make the column required and unique later
+            print("customer_token column added.")
+
+
+        # ---------------------------------------------------------
+        # Hash existing plaintext customer tokens
+        # ---------------------------------------------------------
+
+        cursor.execute("""
+            SELECT customer_id, customer_token
+            FROM customers
+            WHERE customer_token IS NOT NULL
+        """)
+
+        existing_customers = cursor.fetchall()
+
+        for row in existing_customers:
+            customer_id = row[0]
+            token_value = row[1]
+
+            # Skip tokens that are already SHA-256 hashes
+            if re.fullmatch(r"[0-9a-fA-F]{64}", token_value):
+                continue
+
+            token_hash = hashlib.sha256(
+                token_value.encode("utf-8")
+            ).hexdigest()
+
             cursor.execute("""
-                SELECT customer_id
-                FROM customers
-                WHERE customer_token IS NULL
-            """)
+                UPDATE customers
+                SET customer_token = %s
+                WHERE customer_id = %s
+            """, (token_hash, customer_id))
 
-            existing_customers = cursor.fetchall()
 
-            for row in existing_customers:
-                customer_id = row[0]
+        # Make sure column is NOT NULL
+        cursor.execute("""
+            ALTER TABLE customers
+            MODIFY COLUMN customer_token VARCHAR(255) NOT NULL
+        """)
 
-                token = str(uuid.uuid4())
+        # Add unique key only if it does not already exist
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = %s
+              AND TABLE_NAME = 'customers'
+              AND INDEX_NAME = 'uq_customers_customer_token'
+        """, (db_name,))
 
-                token_hash = hashlib.sha256(
-                    token.encode("utf-8")
-                ).hexdigest()
+        unique_exists = cursor.fetchone()[0]
 
-                cursor.execute("""
-                    UPDATE customers
-                    SET customer_token = %s
-                    WHERE customer_id = %s
-                """, (token_hash, customer_id))
-
-            # Make the column required and unique
-            cursor.execute("""
-                ALTER TABLE customers
-                MODIFY COLUMN customer_token VARCHAR(255) NOT NULL
-            """)
-
+        if not unique_exists:
             cursor.execute("""
                 ALTER TABLE customers
                 ADD UNIQUE KEY uq_customers_customer_token (customer_token)
             """)
-
-            print("customer_token column added successfully.")
 
         connection.commit()
 
