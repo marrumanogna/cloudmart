@@ -25,7 +25,6 @@ permissions:
 
 env:
   AWS_REGION: ap-south-1
-  ENVIRONMENT: dev
 
 jobs:
 
@@ -145,7 +144,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
   # --------------------------------------------------------
-  # Run Database Initialization Lambda
+  # Run Database-Init- Lambda
   # --------------------------------------------------------
 
       - name: Initialize CloudMart Database
