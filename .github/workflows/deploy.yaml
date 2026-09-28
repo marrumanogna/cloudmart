@@ -61,11 +61,13 @@ jobs:
 
       - name: Deploy Network Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/network-stack.yaml \
             --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
+              Environment="$ENVIRONMENT" \
             --capabilities CAPABILITY_NAMED_IAM
   # ============================================================
   # DATA
@@ -122,21 +124,24 @@ jobs:
         run: |
           aws cloudformation validate-template \
             --template-body file://cloudformation/data-stack-packaged.yaml
-
       # --------------------------------------------------------
       # Deploy packaged Data Stack
       # --------------------------------------------------------
 
       - name: Deploy Data Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+          DBNAME=$(jq -r '.DBName' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/data-stack-packaged.yaml \
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              DBUsername="${{ secrets.DB_USERNAME }}" \
-              DBPassword="${{ secrets.DB_PASSWORD }}" \
-              NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
+            Environment="$ENVIRONMENT" \
+            DBName="$DBNAME" \
+            DBUsername="${{ secrets.DB_USERNAME }}" \
+            DBPassword="${{ secrets.DB_PASSWORD }}" \
+            NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
       
@@ -219,16 +224,18 @@ jobs:
 
       - name: Deploy Auth Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/auth-stack-packaged.yaml \
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-            Environment=${{ env.ENVIRONMENT }} \
-            AdminToken="${{ secrets.ADMIN_TOKEN }}" \
-            DBUsername="${{ secrets.DB_USERNAME }}" \
-            DBPassword="${{ secrets.DB_PASSWORD }}" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
+              Environment="$ENVIRONMENT" \
+              AdminToken="${{ secrets.ADMIN_TOKEN }}" \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region ${{ env.AWS_REGION }}
             
   # ============================================================
   # API / APPLICATION
@@ -272,17 +279,19 @@ jobs:
 
       - name: Deploy API Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/api-stack-packaged.yaml \
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-            Environment=${{ env.ENVIRONMENT }} \
-            DBUsername="${{ secrets.DB_USERNAME }}" \
-            DBPassword="${{ secrets.DB_PASSWORD }}" \
-            NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }} \
-            --no-fail-on-empty-changeset
+              Environment="$ENVIRONMENT" \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+              NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region ${{ env.AWS_REGION }} \
+              --no-fail-on-empty-changeset
 
       - name: Show API Outputs
         run: |
@@ -365,18 +374,23 @@ jobs:
 
       - name: Deploy Reporting Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+          DASHBOARD_VERSION=$(jq -r '.DashboardVersion' cloudformation/parameters.json)
+          LATEST_AMI_ID=$(jq -r '.LatestAmiId' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/reporting-stack.yaml \
             --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-            Environment=${{ env.ENVIRONMENT }} \
-            DashboardVersion=${{ github.sha }} \
-            DBUsername="${{ secrets.DB_USERNAME }}" \
-            DBPassword="${{ secrets.DB_PASSWORD }}" \
-            AdminToken="${{ secrets.ADMIN_TOKEN }}" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }} \
-            --no-fail-on-empty-changeset
+              Environment="$ENVIRONMENT" \
+              DashboardVersion="$DASHBOARD_VERSION" \
+              LatestAmiId="$LATEST_AMI_ID" \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+              AdminToken="${{ secrets.ADMIN_TOKEN }}" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region ${{ env.AWS_REGION }} \
+              --no-fail-on-empty-changeset
       # --------------------------------------------------------
       # Show Dashboard URL
       # --------------------------------------------------------
@@ -442,13 +456,15 @@ jobs:
 
       - name: Deploy Monitoring Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/monitoring-stack.yaml \
             --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
+              Environment="$ENVIRONMENT" \
               AlarmEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
-              DashboardInstanceId=$DASHBOARD_INSTANCE_ID \
+              DashboardInstanceId="$DASHBOARD_INSTANCE_ID" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }} \
             --no-fail-on-empty-changeset

@@ -7,14 +7,12 @@ Parameters:
 
   Environment:
     Type: String
-    Default: dev
     AllowedValues:
       - dev
       - prod
 
   DBName:
     Type: String
-    Default: cloudmart
 
   DBUsername:
     Type: String

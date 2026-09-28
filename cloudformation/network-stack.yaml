@@ -4,7 +4,6 @@ Description: CloudMart Network Stack
 Parameters:
   Environment:
     Type: String
-    Default: dev
     AllowedValues:
       - dev
       - prod
