@@ -144,22 +144,6 @@ jobs:
             NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
-      
-      - name: Store DB Credentials in SSM
-        run: |
-          aws ssm put-parameter \
-            --name "/cloudmart/${{ env.ENVIRONMENT }}/rds/username" \
-            --value "${{ secrets.DB_USERNAME }}" \
-            --type "SecureString" \
-            --overwrite \
-            --region "${{ env.AWS_REGION }}"
-
-          aws ssm put-parameter \
-            --name "/cloudmart/${{ env.ENVIRONMENT }}/rds/password" \
-            --value "${{ secrets.DB_PASSWORD }}" \
-            --type "SecureString" \
-            --overwrite \
-            --region "${{ env.AWS_REGION }}"
   # --------------------------------------------------------
   # Run Database Initialization Lambda
   # --------------------------------------------------------
@@ -212,15 +196,6 @@ jobs:
         run: |
           aws cloudformation validate-template \
             --template-body file://cloudformation/auth-stack-packaged.yaml
-
-      - name: Store Admin Token in SSM
-        run: |
-          aws ssm put-parameter \
-            --name "/cloudmart/${{ env.ENVIRONMENT }}/auth/admin-token" \
-            --value "${{ secrets.ADMIN_TOKEN }}" \
-            --type "SecureString" \
-            --overwrite \
-            --region "${{ env.AWS_REGION }}"
 
       - name: Deploy Auth Stack
         run: |
