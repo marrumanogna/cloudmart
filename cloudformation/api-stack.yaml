@@ -12,12 +12,10 @@ Parameters:
       - prod
   ThrottleRateLimit:
     Type: Number
-    Default: 10
     Description: API Gateway steady-state request rate limit per second
 
   ThrottleBurstLimit:
     Type: Number
-    Default: 20
     Description: API Gateway burst request limit
 
   DBUsername:

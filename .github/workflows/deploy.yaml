@@ -255,6 +255,8 @@ jobs:
       - name: Deploy API Stack
         run: |
           ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+          THROTTLE_RATE_LIMIT=$(jq -r '.ThrottleRateLimit' cloudformation/parameters.json)
+          THROTTLE_BURST_LIMIT=$(jq -r '.ThrottleBurstLimit' cloudformation/parameters.json)
 
           aws cloudformation deploy \
             --template-file cloudformation/api-stack-packaged.yaml \
