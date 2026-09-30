@@ -298,9 +298,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-      # --------------------------------------------------------
-      # Get Artifacts Bucket
-      # --------------------------------------------------------
 
       - name: Get Artifacts Bucket
         run: |
@@ -313,9 +310,6 @@ jobs:
 
           echo "Artifacts bucket:"
           echo "$ARTIFACTS_BUCKET"
-      # --------------------------------------------------------
-      # Package Dashboard
-      # --------------------------------------------------------
 
       - name: Package Dashboard
         run: |
@@ -338,18 +332,12 @@ jobs:
             "s3://${ARTIFACTS_BUCKET}/dashboard/cloudmart-dashboard.zip"
 
           echo "Dashboard package uploaded successfully."
-      # --------------------------------------------------------
-      # Validate Reporting Template
-      # --------------------------------------------------------
 
       - name: Validate Reporting Template
         run: |
           aws cloudformation validate-template \
             --template-body file://cloudformation/reporting-stack.yaml \
             --region ${{ env.AWS_REGION }}
-      # --------------------------------------------------------
-      # Deploy Reporting Stack
-      # --------------------------------------------------------
 
       - name: Deploy Reporting Stack
         run: |
