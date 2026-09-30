@@ -263,6 +263,8 @@ jobs:
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment="$ENVIRONMENT" \
+              ThrottleRateLimit="$THROTTLE_RATE_LIMIT" \
+              ThrottleBurstLimit="$THROTTLE_BURST_LIMIT" \
               DBUsername="${{ secrets.DB_USERNAME }}" \
               DBPassword="${{ secrets.DB_PASSWORD }}" \
               NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
@@ -434,12 +436,13 @@ jobs:
       - name: Deploy Monitoring Stack
         run: |
           ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
-
+          API_LATENCY_THRESHOLD=$(jq -r '.ApiLatencyThreshold' cloudformation/parameters.json)
           aws cloudformation deploy \
             --template-file cloudformation/monitoring-stack.yaml \
             --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
               Environment="$ENVIRONMENT" \
+              ApiLatencyThreshold="$API_LATENCY_THRESHOLD" \
               AlarmEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
               DashboardInstanceId="$DASHBOARD_INSTANCE_ID" \
             --capabilities CAPABILITY_NAMED_IAM \
