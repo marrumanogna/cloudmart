@@ -3,6 +3,7 @@
   "DBName": "cloudmart",
   "ThrottleRateLimit": 10,
   "ThrottleBurstLimit": 20,
+  "ApiLatencyThreshold": 1000,
   "DashboardVersion": "initial",
   "LatestAmiId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }

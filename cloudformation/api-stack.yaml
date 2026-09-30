@@ -17,7 +17,7 @@ Parameters:
   ThrottleBurstLimit:
     Type: Number
     Description: API Gateway burst request limit
-
+    
   DBUsername:
     Type: String
     NoEcho: true

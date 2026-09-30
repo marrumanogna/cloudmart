@@ -10,6 +10,10 @@ Parameters:
       - dev
       - prod
 
+  ApiLatencyThreshold:
+    Type: Number
+    Description: API Gateway latency alarm threshold in milliseconds
+
   AlarmEmail:
     Type: String
     Description: SSM parameter containing the alarm notification email
@@ -128,6 +132,33 @@ Resources:
       Threshold: 0
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmNotificationTopic
+
+  ApiLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub cloudmart-api-high-latency-${Environment}
+      AlarmDescription: !Sub API Gateway latency is high in ${Environment}
+
+      Namespace: AWS/ApiGateway
+      MetricName: Latency
+
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub cloudmart-api-${Environment}
+        - Name: Stage
+          Value: !Ref Environment
+
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+
+      Threshold: !Ref ApiLatencyThreshold
+      ComparisonOperator: GreaterThanThreshold
+
+      TreatMissingData: notBreaching
+
       AlarmActions:
         - !Ref AlarmNotificationTopic
 
