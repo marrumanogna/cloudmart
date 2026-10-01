@@ -358,6 +358,15 @@ jobs:
               --capabilities CAPABILITY_NAMED_IAM \
               --region ${{ env.AWS_REGION }} \
               --no-fail-on-empty-changeset
+      - name: Generate Initial Report
+        run: |
+          aws lambda invoke \
+            --function-name cloudmart-report-${{ env.ENVIRONMENT }} \
+            --invocation-type Event \
+            --region ${{ env.AWS_REGION }} \
+            initial-report-response.json
+
+          cat initial-report-response.json
       # --------------------------------------------------------
       # Show Dashboard URL
       # --------------------------------------------------------

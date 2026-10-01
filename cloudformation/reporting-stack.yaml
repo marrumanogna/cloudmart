@@ -432,6 +432,7 @@ Resources:
 
               cat > /etc/cloudmart-dashboard.env <<EOF
               AWS_REGION=${AWS::Region}
+              ENVIRONMENT=${Environment}
               REPORTS_BUCKET=${ReportsBucket}
               DB_HOST=${RdsEndpoint}
               DB_PORT=${RdsPort}
@@ -833,6 +834,7 @@ Resources:
 
               cat > /etc/cloudmart-dashboard.env <<EOF
               AWS_REGION=${AWS::Region}
+              ENVIRONMENT=${Environment}
               REPORTS_BUCKET=${ReportsBucket}
               DB_HOST=${RdsEndpoint}
               DB_PORT=${RdsPort}

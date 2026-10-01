@@ -11,11 +11,16 @@ import hmac
 app = Flask(__name__) # used to protect Flask sessions.
 
 app.config["SECRET_KEY"] = os.environ["FLASK_SECRET_KEY"]
-
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev").upper()
 
 AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 REPORTS_BUCKET = os.environ["REPORTS_BUCKET"]
 
+@app.context_processor
+def inject_environment():
+    return {
+        "environment": ENVIRONMENT
+    }
 
 
 s3 = boto3.client(
