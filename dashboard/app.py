@@ -3,6 +3,7 @@ import pymysql
 import boto3
 import csv
 import io
+from botocore.config import Config
 from flask import Flask, render_template, request, redirect, url_for, session
 from functools import wraps
 import hmac
@@ -25,9 +26,14 @@ def inject_environment():
 
 s3 = boto3.client(
     "s3",
-    region_name=AWS_REGION
+    region_name=AWS_REGION,
+    config=Config(
+        signature_version="s3v4",
+        s3={
+            "addressing_style": "path"
+        }
+    )
 )
-
 # ============================================================
 # ADMIN AUTHENTICATION
 # ============================================================
