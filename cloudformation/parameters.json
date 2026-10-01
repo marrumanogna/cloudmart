@@ -1,5 +1,5 @@
 {
-  "Environment": "Dev",
+  "Environment": "dev",
   "DBName": "cloudmart",
   "ThrottleRateLimit": 10,
   "ThrottleBurstLimit": 20,
