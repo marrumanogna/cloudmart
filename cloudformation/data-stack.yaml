@@ -235,9 +235,7 @@ Resources:
           DB_PASSWORD: !Ref DBPassword
 
   DatabaseInitLambdaInvokePolicy:
-  
     Type: AWS::IAM::Policy
-
     Properties:
       PolicyName: !Sub CloudMart-DatabaseInitLambdaInvoke-${Environment}
       Roles:
@@ -250,6 +248,23 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:CloudMart-DatabaseInit-${Environment}
+  ReportLambdaInvokePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub CloudMart-ReportLambdaInvoke-${Environment}
+
+      Roles:
+        - CloudMart-GitHubActions-Role
+
+      PolicyDocument:
+        Version: '2012-10-17'
+
+        Statement:
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:cloudmart-report-${Environment}
 
   # ============================================================
   # DATABASE INIT LAMBDA LOG GROUP
