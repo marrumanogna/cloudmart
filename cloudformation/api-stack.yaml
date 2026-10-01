@@ -945,7 +945,6 @@ Resources:
       ResourceId: !Ref ProductsResource
       HttpMethod: GET
       AuthorizationType: CUSTOM
-      AuthorizerId: !Ref CloudMartAuthorizer
 
       Integration:
         Type: AWS_PROXY
@@ -994,7 +993,6 @@ Resources:
       ResourceId: !Ref ProductIdResource
       HttpMethod: GET
       AuthorizationType: CUSTOM
-      AuthorizerId: !Ref CloudMartAuthorizer
 
       RequestParameters:
         method.request.path.id: true
