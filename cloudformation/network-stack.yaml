@@ -205,6 +205,16 @@ Resources:
       ToPort: 443
       CidrIp: 0.0.0.0/0
 
+  Ec2EgressRds:
+    Type: AWS::EC2::SecurityGroupEgress
+
+    Properties:
+      GroupId: !Ref Ec2DashboardSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      DestinationSecurityGroupId: !Ref RdsSecurityGroup
+
   Ec2EgressHttps:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
