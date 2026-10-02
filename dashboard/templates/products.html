@@ -21,6 +21,10 @@
                 value="{{ search }}"
             >
 
+            {% if stock_filter == "low" %}
+                <input type="hidden" name="stock" value="low">
+            {% endif %}
+
             <button type="submit">Search</button>
 
         </form>

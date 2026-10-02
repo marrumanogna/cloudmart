@@ -3,6 +3,7 @@ import pymysql
 import boto3
 import csv
 import io
+from datetime import date, timedelta
 from botocore.config import Config
 from flask import Flask, render_template, request, redirect, url_for, session
 from functools import wraps
@@ -217,6 +218,46 @@ def dashboard():
         """
     )[0]["count"]
 
+    inventory_counts = query_db(
+        """
+        SELECT
+            SUM(CASE WHEN soft_delete IS NULL AND stock_count > 10 THEN 1 ELSE 0 END) AS in_stock,
+            SUM(CASE WHEN soft_delete IS NULL AND stock_count > 0 AND stock_count <= 10 THEN 1 ELSE 0 END) AS low_stock,
+            SUM(CASE WHEN soft_delete IS NULL AND stock_count = 0 THEN 1 ELSE 0 END) AS out_of_stock
+        FROM products
+        """
+    )[0]
+
+    sales_rows = query_db(
+        """
+        SELECT
+            DATE(created_at) AS order_date,
+            SUM(CASE WHEN status = 'CONFIRMED' THEN 1 ELSE 0 END) AS order_count,
+            COALESCE(SUM(CASE WHEN status = 'CONFIRMED' THEN total_amount ELSE 0 END), 0) AS revenue
+        FROM orders
+        WHERE created_at >= CURDATE() - INTERVAL 6 DAY
+        GROUP BY DATE(created_at)
+        ORDER BY order_date
+        """
+    )
+
+    sales_by_date = {
+        str(row["order_date"]): row
+        for row in sales_rows
+    }
+
+    sales_dates = []
+    sales_orders = []
+    sales_revenue = []
+
+    for offset in range(6, -1, -1):
+        current_day = date.today() - timedelta(days=offset)
+        key = str(current_day)
+        row = sales_by_date.get(key, {})
+        sales_dates.append(current_day.strftime("%b %d"))
+        sales_orders.append(int(row.get("order_count") or 0))
+        sales_revenue.append(float(row.get("revenue") or 0))
+
     best_selling = query_db(
         """
         SELECT
@@ -269,6 +310,12 @@ def dashboard():
         total_revenue=total_revenue,
         low_stock=low_stock,
         failed_orders=failed_orders,
+        inventory_in_stock=int(inventory_counts.get("in_stock") or 0),
+        inventory_low_stock=int(inventory_counts.get("low_stock") or 0),
+        inventory_out_stock=int(inventory_counts.get("out_of_stock") or 0),
+        sales_dates=sales_dates,
+        sales_orders=sales_orders,
+        sales_revenue=sales_revenue,
         best_selling=best_selling,
         recent_orders=recent_orders
     )
@@ -282,6 +329,7 @@ def dashboard():
 def products():
 
     search = request.args.get("search", "").strip()
+    stock_filter = request.args.get("stock", "").strip().lower()
 
     page = request.args.get("page", 1, type=int)
 
@@ -291,70 +339,44 @@ def products():
     per_page = 10
     offset = (page - 1) * per_page
 
-    search_pattern = f"%{search}%"
+    conditions = ["soft_delete IS NULL"]
+    params = []
+
+    if stock_filter == "low":
+        conditions.append("stock_count > 0 AND stock_count <= 10")
 
     if search:
-
-        products = query_db(
-            """
-            SELECT *
-            FROM products
-            WHERE soft_delete IS NULL
-              AND (
-                  name LIKE %s
-                  OR category LIKE %s
-                  OR description LIKE %s
-              )
-            ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
-            """,
-            (
-                search_pattern,
-                search_pattern,
-                search_pattern,
-                per_page,
-                offset
-            )
+        conditions.append(
+            "(name LIKE %s OR category LIKE %s OR description LIKE %s)"
         )
+        search_pattern = f"%{search}%"
+        params.extend([
+            search_pattern,
+            search_pattern,
+            search_pattern
+        ])
 
-        total_result = query_db(
-            """
-            SELECT COUNT(*) AS total
-            FROM products
-            WHERE soft_delete IS NULL
-              AND (
-                  name LIKE %s
-                  OR category LIKE %s
-                  OR description LIKE %s
-              )
-            """,
-            (
-                search_pattern,
-                search_pattern,
-                search_pattern
-            )
-        )
+    where_clause = " AND ".join(conditions)
 
-    else:
+    products = query_db(
+        f"""
+        SELECT *
+        FROM products
+        WHERE {where_clause}
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+        """,
+        (*params, per_page, offset)
+    )
 
-        products = query_db(
-            """
-            SELECT *
-            FROM products
-            WHERE soft_delete IS NULL
-            ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
-            """,
-            (per_page, offset)
-        )
-
-        total_result = query_db(
-            """
-            SELECT COUNT(*) AS total
-            FROM products
-            WHERE soft_delete IS NULL
-            """
-        )
+    total_result = query_db(
+        f"""
+        SELECT COUNT(*) AS total
+        FROM products
+        WHERE {where_clause}
+        """,
+        params
+    )
 
     total_products = total_result[0]["total"]
 
@@ -363,6 +385,7 @@ def products():
         "products.html",
         products=products,
         search=search,
+        stock_filter=stock_filter,
         page=page,
         total_pages=total_pages
     )

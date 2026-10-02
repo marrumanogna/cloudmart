@@ -11,91 +11,86 @@
 
 <body>
 
-<div class="layout">
+<div class="app-shell">
 
-    <aside class="sidebar">
+    <header class="topnav">
 
-        <div class="logo">
-            <div class="logo-icon">C</div>
-            <div>
-                <h2>CloudMart</h2>
-                <span>Admin Console</span>
-            </div>
-        </div>
+        <a href="{{ url_for('dashboard') }}" class="brand">
+            <span class="brand-mark">C</span>
+            <span class="brand-copy">
+                <strong>CloudMart</strong>
+                <small>Admin Console</small>
+            </span>
+        </a>
 
-        <nav>
+        <nav class="topnav-links" aria-label="Primary navigation">
 
             <a href="{{ url_for('dashboard') }}"
-               class="nav-item">
-                <span>▦</span>
+               class="topnav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <span>⌂</span>
                 Dashboard
             </a>
 
             <a href="{{ url_for('products') }}"
-               class="nav-item">
-                <span>▣</span>
+               class="topnav-item {% if request.endpoint == 'products' %}active{% endif %}">
+                <span>◇</span>
                 Products
             </a>
 
             <a href="{{ url_for('customers') }}"
-               class="nav-item">
-                <span>◉</span>
+               class="topnav-item {% if request.endpoint == 'customers' %}active{% endif %}">
+                <span>◎</span>
                 Customers
             </a>
 
             <a href="{{ url_for('orders') }}"
-               class="nav-item">
-                <span>◫</span>
+               class="topnav-item {% if request.endpoint in ['orders', 'order_details'] %}active{% endif %}">
+                <span>▣</span>
                 Orders
             </a>
 
             <a href="{{ url_for('order_items') }}"
-               class="nav-item">
+               class="topnav-item {% if request.endpoint == 'order_items' %}active{% endif %}">
                 <span>≡</span>
                 Order Items
             </a>
 
             <a href="{{ url_for('history') }}"
-               class="nav-item">
+               class="topnav-item {% if request.endpoint == 'history' %}active{% endif %}">
                 <span>◷</span>
                 History
             </a>
 
             <a href="{{ url_for('reports') }}"
-               class="nav-item">
+               class="topnav-item {% if request.endpoint in ['reports', 'view_report'] %}active{% endif %}">
                 <span>▤</span>
                 Reports
             </a>
 
         </nav>
 
-        <div class="sidebar-bottom">
-            <a href="{{ url_for('logout') }}" class="nav-item">
+        <div class="topnav-actions">
+            <div class="environment" aria-label="Environment">
+                <span class="status-dot"></span>
+                {{ environment }}
+            </div>
+
+            <a href="{{ url_for('logout') }}" class="logout-link">
                 <span>↪</span>
                 Logout
             </a>
         </div>
 
-    </aside>
-
+    </header>
 
     <main class="main">
 
-        <header class="topbar">
-
+        <section class="page-heading">
             <div>
                 <h1>{% block page_title %}Dashboard{% endblock %}</h1>
-                <p class="subtitle">
-                    CloudMart Operations Console
-                </p>
+                <p class="subtitle">CloudMart Operations Console</p>
             </div>
-
-            <div class="environment">
-                <span class="status-dot"></span>
-                {{ environment }}
-            </div>
-
-        </header>
+        </section>
 
         <section class="content">
 
@@ -107,6 +102,8 @@
     </main>
 
 </div>
+
+{% block scripts %}{% endblock %}
 
 </body>
 </html>
