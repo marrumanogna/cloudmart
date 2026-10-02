@@ -740,7 +740,25 @@ body {
     justify-content: center;
     transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
 }
+.metric-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
 
+.metric-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #f3f6fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+    line-height: 1;
+    flex: 0 0 42px;
+}
 .metric-card:hover {
     transform: translateY(-1px);
     border-color: #cbd5e1;
@@ -750,7 +768,7 @@ body {
 .metric-label {
     color: var(--cm-muted) !important;
     font-size: 13px !important;
-    margin: 0 0 8px !important;
+    margin: 0 !important;
 }
 
 .metric-card strong {

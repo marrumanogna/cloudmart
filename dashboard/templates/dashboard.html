@@ -9,37 +9,55 @@ Dashboard
 <div class="metrics" aria-label="CloudMart summary">
 
     <a class="metric-card" href="{{ url_for('products') }}" aria-label="View all products">
-        <span class="metric-label">Total Products</span>
+        <div class="metric-top">
+            <span class="metric-icon">▣</span>
+            <span class="metric-label">Total Products</span>
+        </div>
         <strong>{{ total_products }}</strong>
         <span class="metric-link">View products →</span>
     </a>
 
     <a class="metric-card" href="{{ url_for('customers') }}" aria-label="View all customers">
-        <span class="metric-label">Total Customers</span>
+        <div class="metric-top">
+            <span class="metric-icon">♙</span>
+            <span class="metric-label">Total Customers</span>
+        </div>
         <strong>{{ total_customers }}</strong>
         <span class="metric-link">View customers →</span>
     </a>
 
     <a class="metric-card" href="{{ url_for('orders') }}" aria-label="View all orders">
-        <span class="metric-label">Total Orders</span>
+        <div class="metric-top">
+            <span class="metric-icon">🛒</span>
+            <span class="metric-label">Total Orders</span>
+        </div>
         <strong>{{ total_orders }}</strong>
         <span class="metric-link">View orders →</span>
     </a>
 
     <a class="metric-card" href="{{ url_for('orders') }}" aria-label="View revenue orders">
-        <span class="metric-label">Total Revenue</span>
+        <div class="metric-top">
+            <span class="metric-icon">₹</span>
+            <span class="metric-label">Total Revenue</span>
+        </div>
         <strong>₹{{ "%.2f"|format(total_revenue|float) }}</strong>
         <span class="metric-link">View orders →</span>
     </a>
 
     <a class="metric-card warning" href="{{ url_for('products', stock='low') }}" aria-label="View low stock products">
-        <span class="metric-label">Low Stock</span>
+        <div class="metric-top">
+            <span class="metric-icon">⚠</span>
+            <span class="metric-label">Low Stock</span>
+        </div>
         <strong>{{ low_stock }}</strong>
         <span class="metric-link">View low stock →</span>
     </a>
 
     <a class="metric-card danger-card" href="{{ url_for('orders') }}" aria-label="View failed orders">
-        <span class="metric-label">Failed Orders</span>
+        <div class="metric-top">
+            <span class="metric-icon">⊗</span>
+            <span class="metric-label">Failed Orders</span>
+        </div>
         <strong>{{ failed_orders }}</strong>
         <span class="metric-link">View orders →</span>
     </a>
