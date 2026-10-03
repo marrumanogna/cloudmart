@@ -87,10 +87,6 @@ Resources:
     Properties:
       RoleName: !Sub cloudmart-dashboard-role-${Environment}
 
-      # --------------------------------------------------------
-      # EC2 assumes this role
-      # --------------------------------------------------------
-
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
 
@@ -104,24 +100,10 @@ Resources:
             Action:
               - sts:AssumeRole
 
-
-      # --------------------------------------------------------
-      # AWS managed policy
-      # --------------------------------------------------------
-
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
 
-
-      # --------------------------------------------------------
-      # CUSTOM POLICIES
-      # --------------------------------------------------------
-
       Policies:
-
-        # ------------------------------------------------------
-        # Upload bootstrap log to S3
-        # ------------------------------------------------------
 
         - PolicyName: !Sub DashboardBootstrapLogs-${Environment}
 
@@ -141,11 +123,6 @@ Resources:
                     - Bucket:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
 
-
-        # ------------------------------------------------------
-        # Read dashboard package from S3
-        # ------------------------------------------------------
-
         - PolicyName: !Sub DashboardArtifactsRead-${Environment}
 
           PolicyDocument:
@@ -163,10 +140,6 @@ Resources:
                     - arn:${AWS::Partition}:s3:::${Bucket}/dashboard/cloudmart-dashboard.zip
                     - Bucket:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ArtifactsBucketName
-
-        # ------------------------------------------------------
-        # Read generated reports from S3
-        # ------------------------------------------------------
 
         - PolicyName: !Sub DashboardReportsRead-${Environment}
 
@@ -282,12 +255,6 @@ Resources:
 
       IamInstanceProfile:
         !Ref DashboardInstanceProfile
-
-
-      # --------------------------------------------------------
-      # EC2 tags
-      # --------------------------------------------------------
-
       Tags:
 
         - Key: Name
