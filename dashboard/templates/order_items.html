@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block page_title %}Order Items{% endblock %}
+{% block content %}
+<div class="section">
+<div class="section-header">
+
+    <h2>Order Items</h2>
+
+    <form method="get"
+          action="{{ url_for('order_items') }}"
+          class="search-form">
+
+        <input
+            type="text"
+            name="search"
+            placeholder="Search order items..."
+            value="{{ search }}"
+        >
+
+        <button type="submit">Search</button>
+
+    </form>
+
+</div>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+{% for key in items[0].keys() if items %}
+<th>{{ key }}</th>
+{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for item in items %}
+<tr>
+{% for value in item.values() %}
+<td>{{ value }}</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+{% include "_pagination.html" %}
+{% endblock %}

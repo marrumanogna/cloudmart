@@ -7,24 +7,23 @@ Parameters:
 
   Environment:
     Type: String
-    Default: dev
     AllowedValues:
       - dev
       - prod
 
   DBName:
     Type: String
-    Default: cloudmart
 
   DBUsername:
     Type: String
-    Default: cloudmartadmin
+    NoEcho: true
 
   DBPassword:
     Type: String
     NoEcho: true
-    MinLength: 8
 
+  NotificationEmail:
+    Type: String
 
 Resources:
 
@@ -99,7 +98,6 @@ Resources:
 
   RdsHostParameter:
     Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
     Properties:
       Name: !Sub /cloudmart/${Environment}/rds/host
       Type: String
@@ -110,7 +108,6 @@ Resources:
 
   RdsPortParameter:
     Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
     Properties:
       Name: !Sub /cloudmart/${Environment}/rds/port
       Type: String
@@ -121,7 +118,6 @@ Resources:
 
   RdsDbNameParameter:
     Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
     Properties:
       Name: !Sub /cloudmart/${Environment}/rds/db-name
       Type: String
@@ -129,29 +125,6 @@ Resources:
 
       Description: CloudMart database name
   
-  # ============================================================
-  # ARTIFACTS S3 BUCKET
-  # ============================================================
-
-  ArtifactsBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-
-      Tags:
-        - Key: Name
-          Value: !Sub cloudmart-artifacts-${Environment}
-
 
   # ============================================================
   # REPORTS S3 BUCKET
@@ -160,7 +133,6 @@ Resources:
   ReportsBucket:
     Type: AWS::S3::Bucket
     Properties:
-
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -177,82 +149,44 @@ Resources:
           Value: !Sub cloudmart-reports-${Environment}
 
 
-  # ============================================================
-  # DATABASE INIT LAMBDA IAM ROLE
-  # ============================================================
-
   DatabaseInitLambdaRole:
     Type: AWS::IAM::Role
-
     Properties:
-
       RoleName: !Sub CloudMart-DatabaseInitLambda-${Environment}
 
       AssumeRolePolicyDocument:
-
         Version: '2012-10-17'
-
         Statement:
-
           - Effect: Allow
-
             Principal:
               Service:
                 - lambda.amazonaws.com
-
             Action:
               - sts:AssumeRole
 
-
       Policies:
-
-        - PolicyName: DatabaseInitPolicy
-
+        - PolicyName: !Sub DatabaseInitCloudWatch-${Environment}
           PolicyDocument:
-
             Version: '2012-10-17'
-
             Statement:
- 
-              # ------------------------------------------------
-              # SSM
-              # ------------------------------------------------
-
               - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource:
-                    - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-               
-              
-              # ------------------------------------------------
-              # CLOUDWATCH LOGS
-              # ------------------------------------------------
-
-              - Effect: Allow
-
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/CloudMart-DatabaseInit-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/CloudMart-DatabaseInit-${Environment}:*
 
-
-              # ------------------------------------------------
-              # VPC NETWORK INTERFACES
-              # ------------------------------------------------
-
+        - PolicyName: !Sub DatabaseInitVpcAccess-${Environment}
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
               - Effect: Allow
-
                 Action:
                   - ec2:CreateNetworkInterface
                   - ec2:DescribeNetworkInterfaces
                   - ec2:DeleteNetworkInterface
-
                 Resource: "*"
-
 
   # ============================================================
   # DATABASE INIT LAMBDA
@@ -297,18 +231,13 @@ Resources:
           DB_NAME:
             !Ref DBName
 
-          DB_USER_PARAMETER:
-            !Sub /cloudmart/${Environment}/rds/username
-
-          DB_PASSWORD_PARAMETER:
-            !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
   DatabaseInitLambdaInvokePolicy:
-  
     Type: AWS::IAM::Policy
-
     Properties:
-      PolicyName: CloudMart-DatabaseInitLambdaInvoke
+      PolicyName: !Sub CloudMart-DatabaseInitLambdaInvoke-${Environment}
       Roles:
         - CloudMart-GitHubActions-Role
       PolicyDocument:
@@ -319,6 +248,23 @@ Resources:
               - lambda:InvokeFunction
             Resource:
               - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:CloudMart-DatabaseInit-${Environment}
+  ReportLambdaInvokePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub CloudMart-ReportLambdaInvoke-${Environment}
+
+      Roles:
+        - CloudMart-GitHubActions-Role
+
+      PolicyDocument:
+        Version: '2012-10-17'
+
+        Statement:
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:cloudmart-report-${Environment}
 
   # ============================================================
   # DATABASE INIT LAMBDA LOG GROUP
@@ -342,70 +288,48 @@ Resources:
 Outputs:
 
   RdsEndpoint:
-
     Value:
       !GetAtt CloudMartRDS.Endpoint.Address
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-RdsEndpoint
 
 
   RdsPort:
-
     Value:
       !GetAtt CloudMartRDS.Endpoint.Port
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-RdsPort
 
 
-  ArtifactsBucketName:
-
-    Value:
-      !Ref ArtifactsBucket
-
-    Export:
-      Name:
-        !Sub CloudMart-${Environment}-ArtifactsBucketName
-
-
   ReportsBucketName:
-
     Value:
       !Ref ReportsBucket
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-ReportsBucketName
 
 
   DBName:
-
     Value:
       !Ref DBName
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-DBName
 
 
   DBUsername:
-
     Value:
       !Ref DBUsername
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-DBUsername
 
 
   DatabaseInitLambdaArn:
-
     Value:
       !GetAtt DatabaseInitLambda.Arn
-
     Export:
       Name:
         !Sub CloudMart-${Environment}-DatabaseInitLambdaArn

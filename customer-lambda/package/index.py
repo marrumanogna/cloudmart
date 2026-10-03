@@ -1,24 +1,12 @@
 import json
 import os
 import uuid
-import boto3
 import pymysql
-
-ssm = boto3.client("ssm")
+import hashlib
 
 DB_HOST = os.environ["DB_HOST"]
 DB_PORT = int(os.environ["DB_PORT"])
 DB_NAME = os.environ["DB_NAME"]
-DB_USERNAME_PARAMETER = os.environ["DB_USERNAME_PARAMETER"]
-DB_PASSWORD_PARAMETER = os.environ["DB_PASSWORD_PARAMETER"]
-
-
-def get_parameter(name):
-    response = ssm.get_parameter(
-        Name=name,
-        WithDecryption=True
-    )
-    return response["Parameter"]["Value"]
 
 
 def lambda_handler(event, context):
@@ -38,8 +26,8 @@ def lambda_handler(event, context):
                 })
             }
 
-        username = get_parameter(DB_USERNAME_PARAMETER)
-        password = get_parameter(DB_PASSWORD_PARAMETER)
+        username = os.environ["DB_USERNAME"]
+        password = os.environ["DB_PASSWORD"]
 
         connection = pymysql.connect(
             host=DB_HOST,
@@ -55,12 +43,16 @@ def lambda_handler(event, context):
 
                 customer_token = str(uuid.uuid4())
 
+                customer_token_hash = hashlib.sha256(
+                    customer_token.encode("utf-8")
+                ).hexdigest()
+
                 cursor.execute(
                     """
                     INSERT INTO customers (name, email, customer_token)
                     VALUES (%s, %s, %s)
                     """,
-                    (name, email, customer_token)
+                    (name, email, customer_token_hash)
                 )
 
                 customer_id = cursor.lastrowid

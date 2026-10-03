@@ -3,26 +3,41 @@ import os
 import boto3
 import pymysql
 
+cloudwatch = boto3.client("cloudwatch")
 
-ssm = boto3.client("ssm")
+METRIC_NAMESPACE = "CloudMart/Operations"
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
+
+lambda_client = boto3.client("lambda")
 sqs = boto3.client("sqs")
 events_client = boto3.client("events")
 
+def publish_metric(metric_name):
+    cloudwatch.put_metric_data(
+        Namespace=METRIC_NAMESPACE,
+        MetricData=[
+            {
+                "MetricName": metric_name,
+                "Dimensions": [
+                    {
+                        "Name": "Environment",
+                        "Value": ENVIRONMENT
+                    }
+                ],
+                "Value": 1,
+                "Unit": "Count"
+            }
+        ]
+    )
 
 def get_db_connection():
     print("DEBUG: Starting get_db_connection")
 
-    print("DEBUG: Getting DB username from SSM")
-    username = ssm.get_parameter(
-        Name=os.environ["DB_USERNAME_PARAMETER"],
-        WithDecryption=True
-    )["Parameter"]["Value"]
+    print("DEBUG: Getting DB username from environment")
+    username = os.environ["DB_USERNAME"]
 
-    print("DEBUG: Getting DB password from SSM")
-    password = ssm.get_parameter(
-        Name=os.environ["DB_PASSWORD_PARAMETER"],
-        WithDecryption=True
-    )["Parameter"]["Value"]
+    print("DEBUG: Getting DB password from environment")
+    password = os.environ["DB_PASSWORD"]
 
     print("DEBUG: Connecting to RDS")
 
@@ -187,6 +202,7 @@ def lambda_handler(event, context):
                 "OrderFailed",
                 failed_data
             )
+            publish_metric("OrdersFailed")
 
             return response(
                 404,
@@ -234,6 +250,7 @@ def lambda_handler(event, context):
                         "OrderFailed",
                         failed_data
                     )
+                    publish_metric("OrdersFailed")
 
                     return response(
                         400,
@@ -294,6 +311,7 @@ def lambda_handler(event, context):
                         "OrderFailed",
                         failed_data
                     )
+                    publish_metric("OrdersFailed")
 
                     return response(
                         404,
@@ -329,6 +347,7 @@ def lambda_handler(event, context):
                         "OrderFailed",
                         failed_data
                     )
+                    publish_metric("OrdersFailed")
 
                     return response(
                         409,
@@ -487,6 +506,7 @@ def lambda_handler(event, context):
                         "OrderFailed",
                         failed_data
                     )
+                    publish_metric("OrdersFailed")
 
                     return response(
                         409,
@@ -652,6 +672,7 @@ def lambda_handler(event, context):
                 "message": "Failed to store failed order",
                 "error": str(failure_error)
             }))
+        publish_metric("OrdersFailed")
 
         return response(
             500,

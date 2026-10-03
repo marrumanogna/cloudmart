@@ -1,0 +1,19 @@
+<div class="pagination">
+
+    {% if page > 1 %}
+        <a href="{{ request.path }}?page={{ page - 1 }}{% if search %}&search={{ search | urlencode }}{% endif %}">
+            Previous
+        </a>
+    {% endif %}
+
+    <span>
+        Page {{ page }} of {{ total_pages }}
+    </span>
+
+    {% if page < total_pages %}
+        <a href="{{ request.path }}?page={{ page + 1 }}{% if search %}&search={{ search | urlencode }}{% endif %}">
+            Next
+        </a>
+    {% endif %}
+
+</div>

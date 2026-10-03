@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block page_title %}
+Dashboard
+{% endblock %}
+
+{% block content %}
+
+<div class="metrics" aria-label="CloudMart summary">
+
+    <a class="metric-card" href="{{ url_for('products') }}" aria-label="View all products">
+        <div class="metric-top">
+            <span class="metric-icon">▣</span>
+            <span class="metric-label">Total Products</span>
+        </div>
+        <strong>{{ total_products }}</strong>
+        <span class="metric-link">View products →</span>
+    </a>
+
+    <a class="metric-card" href="{{ url_for('customers') }}" aria-label="View all customers">
+        <div class="metric-top">
+            <span class="metric-icon">♙</span>
+            <span class="metric-label">Total Customers</span>
+        </div>
+        <strong>{{ total_customers }}</strong>
+        <span class="metric-link">View customers →</span>
+    </a>
+
+    <a class="metric-card" href="{{ url_for('orders') }}" aria-label="View all orders">
+        <div class="metric-top">
+            <span class="metric-icon">🛒</span>
+            <span class="metric-label">Total Orders</span>
+        </div>
+        <strong>{{ total_orders }}</strong>
+        <span class="metric-link">View orders →</span>
+    </a>
+
+    <a class="metric-card" href="{{ url_for('orders') }}" aria-label="View revenue orders">
+        <div class="metric-top">
+            <span class="metric-icon">₹</span>
+            <span class="metric-label">Total Revenue</span>
+        </div>
+        <strong>₹{{ "%.2f"|format(total_revenue|float) }}</strong>
+        <span class="metric-link">View orders →</span>
+    </a>
+
+    <a class="metric-card warning" href="{{ url_for('products', stock='low') }}" aria-label="View low stock products">
+        <div class="metric-top">
+            <span class="metric-icon">⚠</span>
+            <span class="metric-label">Low Stock</span>
+        </div>
+        <strong>{{ low_stock }}</strong>
+        <span class="metric-link">View low stock →</span>
+    </a>
+
+    <a class="metric-card danger-card" href="{{ url_for('orders') }}" aria-label="View failed orders">
+        <div class="metric-top">
+            <span class="metric-icon">⊗</span>
+            <span class="metric-label">Failed Orders</span>
+        </div>
+        <strong>{{ failed_orders }}</strong>
+        <span class="metric-link">View orders →</span>
+    </a>
+
+</div>
+
+<div class="dashboard-grid">
+
+    <section class="section chart-section">
+        <div class="section-header">
+            <div>
+                <h2>Sales &amp; Revenue Overview</h2>
+                <p>Confirmed orders and revenue over the last 7 days</p>
+            </div>
+
+            <span class="range-pill">Last 7 days</span>
+        </div>
+
+        <div class="chart-card-body">
+            <div class="chart-legend" aria-hidden="true">
+                <span><i class="legend-dot sales-dot"></i>Orders</span>
+                <span><i class="legend-dot revenue-dot"></i>Revenue</span>
+            </div>
+
+            <svg id="salesRevenueChart"
+                 class="sales-chart"
+                 viewBox="0 0 900 320"
+                 role="img"
+                 aria-label="Sales and revenue over the last 7 days"></svg>
+        </div>
+    </section>
+
+    <section class="section inventory-section">
+        <div class="section-header">
+            <div>
+                <h2>Inventory Status</h2>
+                <p>Current product inventory distribution</p>
+            </div>
+        </div>
+
+        <div class="inventory-body">
+            {% set total_inventory = inventory_in_stock + inventory_low_stock + inventory_out_stock %}
+            {% set stock_percent = ((inventory_in_stock / total_inventory) * 100) if total_inventory else 0 %}
+            {% set low_percent = ((inventory_low_stock / total_inventory) * 100) if total_inventory else 0 %}
+            <div class="donut"
+                 style="--stock: {{ stock_percent }}%; --low: {{ stock_percent + low_percent }}%;"
+                 aria-label="Inventory distribution">
+                <div class="donut-center">
+                    <strong>{{ total_inventory }}</strong>
+                    <span>Products</span>
+                </div>
+            </div>
+
+            <div class="inventory-legend">
+                <div>
+                    <span class="inventory-mark stock-mark"></span>
+                    <span>In Stock</span>
+                    <strong>{{ inventory_in_stock }}</strong>
+                </div>
+                <div>
+                    <span class="inventory-mark low-mark"></span>
+                    <span>Low Stock</span>
+                    <strong>{{ inventory_low_stock }}</strong>
+                </div>
+                <div>
+                    <span class="inventory-mark out-mark"></span>
+                    <span>Out of Stock</span>
+                    <strong>{{ inventory_out_stock }}</strong>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<section class="section">
+
+    <div class="section-header">
+
+        <div>
+            <h2>Best Selling Products</h2>
+            <p>Top products based on confirmed order quantities</p>
+        </div>
+
+        <a href="{{ url_for('products') }}"
+           class="button">
+            View Products
+        </a>
+
+    </div>
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Units Sold</th>
+                    <th>Current Stock</th>
+                    <th>Status</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for product in best_selling %}
+
+                <tr>
+
+                    <td>
+                        <strong>{{ product.name }}</strong>
+                    </td>
+
+                    <td>{{ product.category }}</td>
+
+                    <td>₹{{ "%.2f"|format(product.price|float) }}</td>
+
+                    <td>
+                        <strong>{{ product.units_sold }}</strong>
+                    </td>
+
+                    <td>{{ product.stock_count }}</td>
+
+                    <td>
+
+                        {% if product.stock_count == 0 %}
+
+                            <span class="badge danger">
+                                Out of Stock
+                            </span>
+
+                        {% elif product.stock_count <= 10 %}
+
+                            <span class="badge warning">
+                                Low Stock
+                            </span>
+
+                        {% else %}
+
+                            <span class="badge success">
+                                In Stock
+                            </span>
+
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+                    <td colspan="6">
+                        No products available.
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+<section class="section">
+
+    <div class="section-header">
+
+        <div>
+            <h2>Recent Orders</h2>
+            <p>Latest CloudMart transactions</p>
+        </div>
+
+        <a href="{{ url_for('orders') }}"
+           class="button">
+            View All Orders
+        </a>
+
+    </div>
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Created</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for order in recent_orders %}
+
+                <tr>
+
+                    <td>
+                        <a href="{{ url_for('order_details', order_id=order.order_id) }}">
+                            #{{ order.order_id }}
+                        </a>
+                    </td>
+
+                    <td>{{ order.customer_name }}</td>
+
+                    <td>
+                        <span class="badge {% if order.status == 'CONFIRMED' %}success{% elif order.status == 'FAILED' %}danger{% endif %}">
+                            {{ order.status }}
+                        </span>
+                    </td>
+
+                    <td>₹{{ "%.2f"|format(order.total_amount|float) }}</td>
+
+                    <td>{{ order.created_at }}</td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const svg = document.getElementById("salesRevenueChart");
+    if (!svg) return;
+
+    const labels = {{ sales_dates|tojson }};
+    const orders = {{ sales_orders|tojson }};
+    const revenue = {{ sales_revenue|tojson }};
+
+    const width = 900;
+    const height = 320;
+    const left = 54;
+    const right = 54;
+    const top = 26;
+    const bottom = 48;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const maxOrders = Math.max(...orders, 1);
+    const maxRevenue = Math.max(...revenue, 1);
+
+    const makePoints = (values, maxValue) => values.map((value, index) => {
+        const x = left + (plotWidth * index / Math.max(values.length - 1, 1));
+        const y = top + plotHeight - (value / maxValue) * plotHeight;
+        return { x, y, value };
+    });
+
+    const orderPoints = makePoints(orders, maxOrders);
+    const revenuePoints = makePoints(revenue, maxRevenue);
+
+    const polyline = points => points.map(p => `${p.x},${p.y}`).join(" ");
+    const area = points => `${left},${top + plotHeight} ${polyline(points)} ${points[points.length - 1].x},${top + plotHeight}`;
+    const money = value => `₹${Math.round(value).toLocaleString("en-IN")}`;
+
+    let markup = `
+        <defs>
+            <linearGradient id="revenueFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#94a3b8" stop-opacity="0.22" />
+                <stop offset="100%" stop-color="#94a3b8" stop-opacity="0" />
+            </linearGradient>
+        </defs>
+    `;
+
+    for (let i = 0; i <= 4; i++) {
+        const y = top + (plotHeight * i / 4);
+        markup += `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" class="chart-grid" />`;
+    }
+
+    markup += `<polygon points="${area(revenuePoints)}" class="revenue-area" />`;
+    markup += `<polyline points="${polyline(revenuePoints)}" class="revenue-line" />`;
+    markup += `<polyline points="${polyline(orderPoints)}" class="orders-line" />`;
+
+    orderPoints.forEach((point, index) => {
+        markup += `<circle cx="${point.x}" cy="${point.y}" r="4.5" class="orders-point" />`;
+        markup += `<text x="${point.x}" y="${height - 16}" class="chart-label" text-anchor="middle">${labels[index]}</text>`;
+    });
+
+    revenuePoints.forEach(point => {
+        markup += `<circle cx="${point.x}" cy="${point.y}" r="4" class="revenue-point" />`;
+    });
+
+    markup += `<text x="10" y="${top + 6}" class="axis-label">${maxOrders}</text>`;
+    markup += `<text x="${width - right + 10}" y="${top + 6}" class="axis-label">${money(maxRevenue)}</text>`;
+    markup += `<text x="10" y="${top + plotHeight}" class="axis-label">0</text>`;
+    markup += `<text x="${width - right + 10}" y="${top + plotHeight}" class="axis-label">₹0</text>`;
+
+    svg.innerHTML = markup;
+})();
+</script>
+{% endblock %}

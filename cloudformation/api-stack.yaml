@@ -7,22 +7,28 @@ Parameters:
 
   Environment:
     Type: String
-    Default: dev
     AllowedValues:
       - dev
       - prod
+  ThrottleRateLimit:
+    Type: Number
+    Description: API Gateway steady-state request rate limit per second
 
-  LowStockEmail:
+  ThrottleBurstLimit:
+    Type: Number
+    Description: API Gateway burst request limit
+    
+  DBUsername:
     Type: String
-    Default: ""
-    Description: Email address for low-stock SNS alerts. Leave empty to skip subscription.
+    NoEcho: true
 
-Conditions:
+  DBPassword:
+    Type: String
+    NoEcho: true
 
-  CreateLowStockSubscription: !Not
-    - !Equals
-      - !Ref LowStockEmail
-      - ""
+  NotificationEmail:
+    Type: String
+
 Resources:
 
   FailedOrdersQueue:
@@ -48,9 +54,10 @@ Resources:
             Action:
               - sts:AssumeRole
 
+
       Policies:
 
-        - PolicyName: CustomerLambdaSSM
+        - PolicyName: !Sub CustomerLambdaSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -58,9 +65,11 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/host
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/port
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/db-name
 
-        - PolicyName: CustomerLambdaCloudWatch
+        - PolicyName: !Sub CustomerLambdaCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -70,9 +79,9 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-customer-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-customer-${Environment}:*
 
-        - PolicyName: CustomerLambdaVpcAccess
+        - PolicyName: !Sub CustomerLambdaVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -104,7 +113,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: ProductLambdaSSM
+        - PolicyName: !Sub ProductLambdaSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -112,9 +121,11 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/host
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/port
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/db-name
 
-        - PolicyName: ProductLambdaEventsAndSNS
+        - PolicyName: !Sub ProductLambdaEventsAndSNS-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -131,20 +142,25 @@ Resources:
                 Resource:
                   - !Ref LowStockTopic
 
-        - PolicyName: ProductLambdaCloudWatch
+        - PolicyName: !Sub ProductLambdaCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                  - cloudwatch:PutMetricData
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-product-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-product-${Environment}:*
 
-        - PolicyName: ProductLambdaVpcAccess
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+
+        - PolicyName: !Sub ProductLambdaVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -178,7 +194,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: OrderLambdaSSM
+        - PolicyName: !Sub OrderLambdaSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -186,9 +202,11 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/host
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/port
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/db-name
 
-        - PolicyName: OrderLambdaInvokeProcessor
+        - PolicyName: !Sub OrderLambdaInvokeProcessor-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -198,7 +216,7 @@ Resources:
                 Resource:
                   - !GetAtt OrderProcessorLambda.Arn
 
-        - PolicyName: OrderLambdaEvents
+        - PolicyName: !Sub OrderLambdaEvents-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -208,7 +226,7 @@ Resources:
                 Resource:
                   - !GetAtt CloudMartEventBus.Arn
 
-        - PolicyName: OrderLambdaCloudWatch
+        - PolicyName: !Sub OrderLambdaCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -217,11 +235,15 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                  - cloudwatch:PutMetricData
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-order-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-order-${Environment}:*
 
-        - PolicyName: OrderLambdaVpcAccess
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+
+        - PolicyName: !Sub OrderLambdaVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -246,6 +268,7 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
+
           - Effect: Allow
             Principal:
               Service:
@@ -255,7 +278,7 @@ Resources:
 
       Policies:
 
-        - PolicyName: OrderProcessorSSM
+        - PolicyName: !Sub OrderProcessorSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -263,9 +286,11 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/host
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/port
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/db-name
 
-        - PolicyName: OrderProcessorCloudWatch
+        - PolicyName: !Sub OrderProcessorCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -274,11 +299,14 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                  - cloudwatch:PutMetricData
                 Resource:
                   - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-order-processor-${Environment}:*
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
 
-        - PolicyName: OrderProcessorVpcAccess
+        - PolicyName: !Sub OrderProcessorVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -290,7 +318,7 @@ Resources:
                   - ec2:DeleteNetworkInterface
                 Resource: '*'
 
-        - PolicyName: OrderProcessorSQS
+        - PolicyName: !Sub OrderProcessorSQS-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -299,7 +327,7 @@ Resources:
                   - sqs:SendMessage
                 Resource: !GetAtt FailedOrdersQueue.Arn
 
-        - PolicyName: OrderProcessorEvents
+        - PolicyName: !Sub OrderProcessorEvents-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -331,7 +359,10 @@ Resources:
 
       Policies:
 
-        - PolicyName: ReportLambdaSSM
+        # --------------------------------------------------------
+        # SSM - Read RDS credentials
+        # --------------------------------------------------------
+        - PolicyName: !Sub ReportLambdaSSM-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -339,9 +370,13 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/*
-
-        - PolicyName: ReportLambdaS3
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/host
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/port
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cloudmart/${Environment}/rds/db-name
+        # --------------------------------------------------------
+        # S3 - Write daily reports
+        # --------------------------------------------------------
+        - PolicyName: !Sub ReportLambdaS3-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -351,26 +386,35 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - !Sub
-                    - arn:${AWS::Partition}:s3:::${Bucket}/*
+                    - arn:${AWS::Partition}:s3:::${Bucket}/reports/*
                     - Bucket:
                         Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
-        - PolicyName: ReportLambdaCloudWatch
+
+        # --------------------------------------------------------
+        # CloudWatch Logs + Metrics
+        # --------------------------------------------------------
+        - PolicyName: !Sub ReportLambdaCloudWatch-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - arn:aws:logs:ap-south-1:230623977534:log-group:/aws/lambda/cloudmart-report-${Environment}:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cloudmart-report-${Environment}:*
 
               - Effect: Allow
                 Action:
                   - cloudwatch:PutMetricData
                 Resource: '*'
-        - PolicyName: ReportLambdaVpcAccess
+
+        # --------------------------------------------------------
+        # VPC access
+        # --------------------------------------------------------
+        - PolicyName: !Sub ReportLambdaVpcAccess-${Environment}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -381,7 +425,6 @@ Resources:
                   - ec2:DescribeSubnets
                   - ec2:DeleteNetworkInterface
                 Resource: '*'
-
 
   # ============================================================
   # EVENTBRIDGE
@@ -402,14 +445,13 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-low-stock-${Environment}
 
-  LowStockSubscription:
+  LowStockSubscriptionV3:
     Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
     Properties:
       Protocol: email
-      Endpoint: !Ref LowStockEmail
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref LowStockTopic
-  
+
 # ============================================================
 # M4 ORDER CONFIRMATION SNS
 # ============================================================
@@ -418,19 +460,19 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub cloudmart-order-confirmed-${Environment}
-  OrderConfirmedEmailSubscription:
+
+  OrderConfirmedEmailSubscriptionV3:
     Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Ref LowStockEmail
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref OrderConfirmedTopic
 
   #============================================================
   # M3 INVENTORY CHANGE EVENTBRIDGE RULE
   # ============================================================
-  
+
   InventoryChangeRule:
     Type: AWS::Events::Rule
     Properties:
@@ -452,10 +494,7 @@ Resources:
               product_id: "$.detail.product_id"
               product_name: "$.detail.product_name"
               stock_quantity: "$.detail.stock_quantity"
-
-            InputTemplate: '"CloudMart Low Stock Alert!\n\nProduct ID: <product_id>\nProduct: <product_name>\nRemaining Stock: <stock_quantity>\n\nPlease restock this product."'
-
-
+            InputTemplate: '"LOW STOCK ALERT - CLOUDMART | Product ID: <product_id> | Product: <product_name> | Remaining Stock: <stock_quantity> | Please restock this product."'
   LowStockTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
@@ -486,13 +525,12 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-order-placed-${Environment}
 
-  OrderPlacedEmailSubscription:
+  OrderPlacedEmailSubscriptionV3:
     Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Ref LowStockEmail
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref OrderPlacedTopic
 
   OrderPlacedRule:
@@ -515,10 +553,7 @@ Resources:
             InputPathsMap:
               order_id: "$.detail.order_id"
               customer_id: "$.detail.customer_id"
-
-            InputTemplate: '"Order Placed!\n\nHello,\n\nYour CloudMart order has been successfully placed.\n\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nStatus: PLACED\n\nWe are processing your order and will keep you updated.\n\nThank you for shopping with CloudMart!"'
-
-
+            InputTemplate: '"ORDER PLACED - CLOUDMART | Order ID: <order_id> | Customer ID: <customer_id> | Status: PLACED | Your order is being processed."'
   OrderPlacedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
@@ -562,10 +597,7 @@ Resources:
               customer_id: "$.detail.customer_id"
               total_amount: "$.detail.total_amount"
               status: "$.detail.status"
-
-            InputTemplate: '"Order Confirmed!\n\nHello,\n\nYour CloudMart order has been successfully confirmed.\n\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nTotal Amount: ₹<total_amount>\nStatus: <status>\n\nThank you for shopping with CloudMart!"'
-
-
+            InputTemplate: '"ORDER CONFIRMED - CLOUDMART | Order ID: <order_id> | Customer ID: <customer_id> | Total Amount: ₹<total_amount> | Status: <status> | Your order has been confirmed."'
   OrderConfirmedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
@@ -596,13 +628,12 @@ Resources:
     Properties:
       TopicName: !Sub cloudmart-order-failed-${Environment}
 
-  OrderFailedEmailSubscription:
+  OrderFailedEmailSubscriptionV3:
     Type: AWS::SNS::Subscription
-    Condition: CreateLowStockSubscription
     DeletionPolicy: Delete
     Properties:
       Protocol: email
-      Endpoint: !Ref LowStockEmail
+      Endpoint: !Ref NotificationEmail
       TopicArn: !Ref OrderFailedTopic
 
   OrderFailedRule:
@@ -625,8 +656,7 @@ Resources:
               order_id: "$.detail.order_id"
               customer_id: "$.detail.customer_id"
               reason: "$.detail.reason"
-
-            InputTemplate: '"Order Failed!\n\nHello,\n\nUnfortunately, we were unable to process your CloudMart order.\n\nOrder ID: <order_id>\nCustomer ID: <customer_id>\nReason: <reason>\n\nPlease try again or choose another product.\n\nThank you,\nCloudMart Team"'
+            InputTemplate: '"ORDER FAILED - CLOUDMART | Order ID: <order_id> | Customer ID: <customer_id> | Reason: <reason> | Please try again or choose another product."'
 
   OrderFailedTopicPolicy:
     Type: AWS::SNS::TopicPolicy
@@ -684,8 +714,8 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
       CodeUri: ../customer-lambda/package/
   # ============================================================
@@ -723,8 +753,8 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
           EVENT_BUS_NAME: !Ref CloudMartEventBus
           LOW_STOCK_TOPIC_ARN: !Ref LowStockTopic
@@ -757,6 +787,18 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
+          DB_HOST:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
+
+          DB_PORT:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
+
+          DB_NAME:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
+
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
+
           ORDER_PROCESSOR_FUNCTION: !Ref OrderProcessorLambda
           EVENT_BUS_NAME: !Ref CloudMartEventBus
 
@@ -798,8 +840,8 @@ Resources:
           DB_NAME:
             Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-          DB_USERNAME_PARAMETER: !Sub /cloudmart/${Environment}/rds/username
-          DB_PASSWORD_PARAMETER: !Sub /cloudmart/${Environment}/rds/password
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
           FAILED_ORDERS_QUEUE_URL: !Ref FailedOrdersQueue
           EVENT_BUS_NAME: !Ref CloudMartEventBus
@@ -818,7 +860,7 @@ Resources:
       Runtime: python3.11
       Handler: index.lambda_handler
       Role: !GetAtt ReportLambdaRole.Arn
-      Timeout: 30
+      Timeout: 60
       MemorySize: 256
 
       VpcConfig:
@@ -828,34 +870,27 @@ Resources:
 
         SecurityGroupIds:
           - Fn::ImportValue: !Sub CloudMart-${Environment}-LambdaSecurityGroupId
-
       Environment:
         Variables:
-          ENVIRONMENT: !Ref Environment
+          ENVIRONMENT:
+            Ref: Environment
 
           REPORTS_BUCKET:
             Fn::ImportValue: !Sub CloudMart-${Environment}-ReportsBucketName
 
-      InlineCode: |
-          import json
-          import os
+          DB_HOST:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsEndpoint
 
-          def lambda_handler(event, context):
+          DB_PORT:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-RdsPort
 
-              print(json.dumps({
-                  "message": "Report Lambda invoked",
-                  "environment": os.environ["ENVIRONMENT"],
-                  "request_id": context.aws_request_id
-              }))
+          DB_NAME:
+            Fn::ImportValue: !Sub CloudMart-${Environment}-DBName
 
-              return {
-                  "statusCode": 200,
-                  "body": json.dumps({
-                      "message": "Report service is deployed"
-                  })
-              }
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
 
-
+      CodeUri: ../report-lambda-package/
   # ============================================================
   # API GATEWAY
   # ============================================================
@@ -909,13 +944,11 @@ Resources:
       RestApiId: !Ref CloudMartApi
       ResourceId: !Ref ProductsResource
       HttpMethod: GET
-      AuthorizationType: CUSTOM
-      AuthorizerId: !Ref CloudMartAuthorizer
+      AuthorizationType: NONE
 
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-
         Uri:
           Fn::Sub:
             - arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations
@@ -959,8 +992,7 @@ Resources:
       RestApiId: !Ref CloudMartApi
       ResourceId: !Ref ProductIdResource
       HttpMethod: GET
-      AuthorizationType: CUSTOM
-      AuthorizerId: !Ref CloudMartAuthorizer
+      AuthorizationType: NONE
 
       RequestParameters:
         method.request.path.id: true
@@ -1178,7 +1210,7 @@ Resources:
   # API DEPLOYMENT
   # ============================================================
 
-  CloudMartApiDeploymentV3:
+  CloudMartApiDeploymentV4:
      Type: AWS::ApiGateway::Deployment
 
      DependsOn:
@@ -1202,11 +1234,15 @@ Resources:
     Type: AWS::ApiGateway::Stage
     Properties:
       RestApiId: !Ref CloudMartApi
-      DeploymentId: !Ref CloudMartApiDeploymentV3
+      DeploymentId: !Ref CloudMartApiDeploymentV4
       StageName: !Ref Environment
       Description: !Sub CloudMart ${Environment} API stage
 
-
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingRateLimit: !Ref ThrottleRateLimit
+          ThrottlingBurstLimit: !Ref ThrottleBurstLimit
 # ================================================================
 # OUTPUTS
 # ================================================================

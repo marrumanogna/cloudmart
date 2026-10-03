@@ -3,6 +3,29 @@ import os
 import boto3
 import pymysql
 
+cloudwatch = boto3.client("cloudwatch")
+
+METRIC_NAMESPACE = "CloudMart/Operations"
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
+
+
+def publish_metric(metric_name):
+    cloudwatch.put_metric_data(
+        Namespace=METRIC_NAMESPACE,
+        MetricData=[
+            {
+                "MetricName": metric_name,
+                "Dimensions": [
+                    {
+                        "Name": "Environment",
+                        "Value": ENVIRONMENT
+                    }
+                ],
+                "Value": 1,
+                "Unit": "Count"
+            }
+        ]
+    )
 
 lambda_client = boto3.client("lambda")
 events_client = boto3.client("events")
@@ -41,15 +64,8 @@ def get_db_connection():
         WithDecryption=True
     )["Parameter"]["Value"]
 
-    username = ssm_client.get_parameter(
-        Name=f"/cloudmart/{environment}/rds/username",
-        WithDecryption=True
-    )["Parameter"]["Value"]
-
-    password = ssm_client.get_parameter(
-        Name=f"/cloudmart/{environment}/rds/password",
-        WithDecryption=True
-    )["Parameter"]["Value"]
+    username = os.environ["DB_USERNAME"]
+    password = os.environ["DB_PASSWORD"]
 
     database = ssm_client.get_parameter(
         Name=f"/cloudmart/{environment}/rds/db-name",
@@ -64,7 +80,6 @@ def get_db_connection():
         database=database,
         cursorclass=pymysql.cursors.DictCursor
     )
-
 
 def lambda_handler(event, context):
 
@@ -197,6 +212,7 @@ def lambda_handler(event, context):
                     "error": str(event_error),
                     "order_id": order_id
                 }))
+            publish_metric("OrdersPlaced")
 
             return response(
                 201,
@@ -316,7 +332,7 @@ def lambda_handler(event, context):
 
             except Exception:
                 conn.rollback()
-                raises
+                raise
 
             finally:
                 cursor.close()

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block page_title %}History{% endblock %}
+{% block content %}
+<div class="section">
+<div class="section-header">
+
+    <h2>History / Audit Log</h2>
+
+    <form method="get"
+          action="{{ url_for('history') }}"
+          class="search-form">
+
+        <input
+            type="text"
+            name="search"
+            placeholder="Search history..."
+            value="{{ search }}"
+        >
+
+        <button type="submit">Search</button>
+
+    </form>
+
+</div>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+{% for key in history[0].keys() if history %}
+<th>{{ key }}</th>
+{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for row in history %}
+<tr>
+{% for value in row.values() %}
+<td>{{ value }}</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+{% include "_pagination.html" %}
+{% endblock %}

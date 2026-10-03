@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+
+<div class="reports-page">
+
+    {% if latest_report %}
+
+    <div class="daily-report-card">
+
+        <div class="report-info">
+            <div class="report-icon">▤</div>
+
+            <div>
+                <h3>Daily Report</h3>
+                <p>View or download today's CloudMart revenue report.</p>
+            </div>
+        </div>
+
+        <div class="report-actions">
+            <a
+                href="{{ url_for('view_report', key=latest_report.Key) }}"
+                target="_blank"
+                class="report-btn view-btn"
+            >
+                View Today's CSV
+            </a>
+
+            <a
+                href="{{ url_for('download_report', key=latest_report.Key) }}"
+                class="report-btn download-btn"
+            >
+                Download Today's CSV
+            </a>
+        </div>
+
+    </div>
+
+    {% else %}
+
+    <div class="daily-report-card">
+        <div class="report-info">
+            <div class="report-icon">▤</div>
+            <div>
+                <h3>Daily Report</h3>
+                <p>No report has been generated yet.</p>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+
+
+    <div class="section reports-history">
+
+        <div class="section-header">
+            <div>
+                <h2>Previous Reports</h2>
+                <p>Previously generated CloudMart reports.</p>
+            </div>
+        </div>
+
+        {% if reports %}
+
+        <div class="table-container">
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Report</th>
+                        <th>Last Modified</th>
+                        <th>Size</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for report in reports %}
+
+                    <tr>
+
+                        <td>{{ report.Key.split('/')[-1] }}</td>
+
+                        <td>
+                            {{ report.LastModified.strftime('%d %b %Y, %I:%M %p') }}
+                        </td>
+
+                        <td>
+                            {{ report.Size }} bytes
+                        </td>
+
+                        <td>
+
+                            <div class="report-table-actions">
+
+                                <a
+                                    href="{{ url_for('view_report', key=report.Key) }}"
+                                    target="_blank"
+                                    class="small-btn view-btn"
+                                >
+                                    View
+                                </a>
+
+                                <a
+                                    href="{{ url_for('download_report', key=report.Key) }}"
+                                    class="small-btn download-btn"
+                                >
+                                    Download
+                                </a>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+        </div>
+
+        {% else %}
+
+        <div class="empty-state">
+            No previous reports available.
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

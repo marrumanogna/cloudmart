@@ -7,12 +7,14 @@ on:
       - milestone-4
     paths:
       - 'cloudformation/**'
+      - 'dashboard/**'
+      - 'report-lambda-package/**'
+      - 'authorizer-code/**'
       - 'product-lambda/**'
+      - 'customer-lambda/**'
       - 'order-lambda/**'
       - 'order-processor-lambda/**'
-      - 'customer-lambda/**'
       - 'database-init-lambda/**'
-      - 'database/**'
       - '.github/workflows/deploy.yaml'
 
   workflow_dispatch:
@@ -26,6 +28,7 @@ env:
   ENVIRONMENT: dev
 
 jobs:
+
 
   # ============================================================
   # NETWORK
@@ -44,6 +47,7 @@ jobs:
           echo "Ref: $GITHUB_REF"
           echo "Branch: $GITHUB_REF_NAME"
           echo "Event: $GITHUB_EVENT_NAME"
+      
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -57,14 +61,14 @@ jobs:
 
       - name: Deploy Network Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/network-stack.yaml \
             --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
+              Environment="$ENVIRONMENT" \
             --capabilities CAPABILITY_NAMED_IAM
-
-
   # ============================================================
   # DATA
   # ============================================================
@@ -83,7 +87,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-
+  
       # --------------------------------------------------------
       # Get Artifacts Bucket
       # --------------------------------------------------------
@@ -91,64 +95,15 @@ jobs:
       - name: Get Artifacts Bucket
         run: |
           ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
-            --output text 2>/dev/null || true)
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
-          if [ -z "$ARTIFACTS_BUCKET" ] || [ "$ARTIFACTS_BUCKET" = "None" ]; then
-            echo "Artifacts bucket does not exist yet."
-            echo "The data stack creates the bucket, so packaging cannot use it before first deployment."
-          else
-            echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
-          fi
-
-      # --------------------------------------------------------
-      # First deployment / RDS + S3
-      # --------------------------------------------------------
-
-      - name: Check Data Stack
-        id: check-data-stack
-        run: |
-          if aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Deploy Data Stack First Time
-        if: steps.check-data-stack.outputs.exists == 'false'
-        run: |
-          aws cloudformation validate-template \
-            --template-body file://cloudformation/data-stack.yaml
-
-          aws cloudformation deploy \
-            --template-file cloudformation/data-stack.yaml \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              DBUsername="${{ secrets.DB_USERNAME }}" \
-              DBPassword="${{ secrets.DB_PASSWORD }}" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
-
-      # --------------------------------------------------------
-      # Get bucket after first deployment
-      # --------------------------------------------------------
-
-      - name: Get Artifacts Bucket After Deployment
-        run: |
-          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
-            --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
-            --output text)
-
-          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
+          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> "$GITHUB_ENV"
 
           echo "Artifacts bucket:"
           echo "$ARTIFACTS_BUCKET"
-
       # --------------------------------------------------------
       # Package Database Init Lambda
       # --------------------------------------------------------
@@ -169,24 +124,26 @@ jobs:
         run: |
           aws cloudformation validate-template \
             --template-body file://cloudformation/data-stack-packaged.yaml
-
       # --------------------------------------------------------
       # Deploy packaged Data Stack
       # --------------------------------------------------------
 
       - name: Deploy Data Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+          DBNAME=$(jq -r '.DBName' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/data-stack-packaged.yaml \
             --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              DBUsername="${{ secrets.DB_USERNAME }}" \
-              DBPassword="${{ secrets.DB_PASSWORD }}" \
+            Environment="$ENVIRONMENT" \
+            DBName="$DBNAME" \
+            DBUsername="${{ secrets.DB_USERNAME }}" \
+            DBPassword="${{ secrets.DB_PASSWORD }}" \
+            NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --region ${{ env.AWS_REGION }}
-
-
   # --------------------------------------------------------
   # Run Database Initialization Lambda
   # --------------------------------------------------------
@@ -199,8 +156,6 @@ jobs:
             database-init-response.json
 
           cat database-init-response.json
-
-
   # ============================================================
   # AUTH
   # ============================================================
@@ -223,7 +178,7 @@ jobs:
       - name: Get Artifacts Bucket
         run: |
           ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
             --output text)
 
@@ -236,6 +191,7 @@ jobs:
             --s3-bucket "$ARTIFACTS_BUCKET" \
             --output-template-file cloudformation/auth-stack-packaged.yaml \
             --region ${{ env.AWS_REGION }}
+
       - name: Validate Auth Template
         run: |
           aws cloudformation validate-template \
@@ -243,20 +199,22 @@ jobs:
 
       - name: Deploy Auth Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/auth-stack-packaged.yaml \
             --stack-name cloudmart-auth-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              CustomerTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/customer-token" \
-              AdminTokenParameterName="/cloudmart/${{ env.ENVIRONMENT }}/auth/admin-token" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
-
+              Environment="$ENVIRONMENT" \
+              AdminToken="${{ secrets.ADMIN_TOKEN }}" \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region ${{ env.AWS_REGION }}
+            
   # ============================================================
   # API / APPLICATION
   # ============================================================
-
   deploy-api:
     name: Deploy API and Application Stack
     needs: deploy-auth
@@ -280,7 +238,7 @@ jobs:
       - name: Get Artifacts Bucket
         run: |
           ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name cloudmart-data-${{ env.ENVIRONMENT }} \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
             --output text)
 
@@ -296,14 +254,23 @@ jobs:
 
       - name: Deploy API Stack
         run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+          THROTTLE_RATE_LIMIT=$(jq -r '.ThrottleRateLimit' cloudformation/parameters.json)
+          THROTTLE_BURST_LIMIT=$(jq -r '.ThrottleBurstLimit' cloudformation/parameters.json)
+
           aws cloudformation deploy \
             --template-file cloudformation/api-stack-packaged.yaml \
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              LowStockEmail="marrumanogna@gmail.com" \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ${{ env.AWS_REGION }}
+              Environment="$ENVIRONMENT" \
+              ThrottleRateLimit="$THROTTLE_RATE_LIMIT" \
+              ThrottleBurstLimit="$THROTTLE_BURST_LIMIT" \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+              NotificationEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region ${{ env.AWS_REGION }} \
+              --no-fail-on-empty-changeset
 
       - name: Show API Outputs
         run: |
@@ -311,3 +278,181 @@ jobs:
             --stack-name cloudmart-api-${{ env.ENVIRONMENT }} \
             --query "Stacks[0].Outputs" \
             --output table
+  # ============================================================
+  # REPORTING / DASHBOARD
+  # ============================================================
+
+  deploy-reporting:
+    name: Deploy Reporting and Dashboard Stack
+    needs: deploy-api
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Artifacts Bucket
+        run: |
+          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-network-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
+            --output text)
+
+          echo "ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET" >> $GITHUB_ENV
+
+          echo "Artifacts bucket:"
+          echo "$ARTIFACTS_BUCKET"
+
+      - name: Package Dashboard
+        run: |
+          cd dashboard
+
+          zip -r ../cloudmart-dashboard.zip .
+
+          cd ..
+
+          echo "Dashboard package created:"
+          ls -lh cloudmart-dashboard.zip
+      # --------------------------------------------------------
+      # Upload Dashboard Package
+      # --------------------------------------------------------
+
+      - name: Upload Dashboard Package
+        run: |
+          aws s3 cp \
+            cloudmart-dashboard.zip \
+            "s3://${ARTIFACTS_BUCKET}/dashboard/cloudmart-dashboard.zip"
+
+          echo "Dashboard package uploaded successfully."
+
+      - name: Validate Reporting Template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/reporting-stack.yaml \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy Reporting Stack
+        run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+          DASHBOARD_VERSION=$(jq -r '.DashboardVersion' cloudformation/parameters.json)
+          LATEST_AMI_ID=$(jq -r '.LatestAmiId' cloudformation/parameters.json)
+
+          aws cloudformation deploy \
+            --template-file cloudformation/reporting-stack.yaml \
+            --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              Environment="$ENVIRONMENT" \
+              DashboardVersion="$DASHBOARD_VERSION" \
+              LatestAmiId="$LATEST_AMI_ID" \
+              DBUsername="${{ secrets.DB_USERNAME }}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+              AdminToken="${{ secrets.ADMIN_TOKEN }}" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --region ${{ env.AWS_REGION }} \
+              --no-fail-on-empty-changeset
+      - name: Generate Initial Report
+        run: |
+          aws lambda invoke \
+            --function-name cloudmart-report-${{ env.ENVIRONMENT }} \
+            --invocation-type Event \
+            --region ${{ env.AWS_REGION }} \
+            initial-report-response.json
+
+          cat initial-report-response.json
+      # --------------------------------------------------------
+      # Show Dashboard URL
+      # --------------------------------------------------------
+
+      - name: Show Dashboard URL
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='DashboardUrl'].OutputValue" \
+            --output text
+      # --------------------------------------------------------
+      # Validate Monitoring Template
+      # --------------------------------------------------------
+
+      - name: Validate Monitoring Template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/monitoring-stack.yaml \
+            --region ${{ env.AWS_REGION }}
+
+      # --------------------------------------------------------
+      # Get Dashboard Instance ID
+      # --------------------------------------------------------
+
+      - name: Get Dashboard Instance ID
+        run: |
+          DASHBOARD_INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-reporting-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='DashboardInstanceId'].OutputValue" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          echo "DashboardInstanceId=$DASHBOARD_INSTANCE_ID"
+          echo "DASHBOARD_INSTANCE_ID=$DASHBOARD_INSTANCE_ID" >> "$GITHUB_ENV"
+
+      # --------------------------------------------------------
+      # Recover Failed Monitoring Stack
+      # --------------------------------------------------------
+
+      - name: Recover Failed Monitoring Stack
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].StackStatus" \
+            --output text \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || true)
+
+          if [ "$STATUS" = "ROLLBACK_FAILED" ]; then
+            echo "Monitoring stack is ROLLBACK_FAILED. Deleting it so CloudFormation can recreate it."
+
+            aws cloudformation delete-stack \
+              --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+              --region ${{ env.AWS_REGION }}
+
+            aws cloudformation wait stack-delete-complete \
+              --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+              --region ${{ env.AWS_REGION }}
+          fi
+
+      # --------------------------------------------------------
+      # Deploy Monitoring Stack
+      # --------------------------------------------------------
+
+      - name: Deploy Monitoring Stack
+        run: |
+          ENVIRONMENT=$(jq -r '.Environment' cloudformation/parameters.json)
+          API_LATENCY_THRESHOLD=$(jq -r '.ApiLatencyThreshold' cloudformation/parameters.json)
+          aws cloudformation deploy \
+            --template-file cloudformation/monitoring-stack.yaml \
+            --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+            --parameter-overrides \
+              Environment="$ENVIRONMENT" \
+              ApiLatencyThreshold="$API_LATENCY_THRESHOLD" \
+              AlarmEmail="${{ secrets.NOTIFICATION_EMAIL }}" \
+              DashboardInstanceId="$DASHBOARD_INSTANCE_ID" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset
+      # --------------------------------------------------------
+      # Show Monitoring Dashboard
+      # --------------------------------------------------------
+
+      - name: Show Monitoring Dashboard
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name cloudmart-monitoring-${{ env.ENVIRONMENT }} \
+            --query "Stacks[0].Outputs[?OutputKey=='OperationsDashboardUrl'].OutputValue" \
+            --output text \
+            --region ${{ env.AWS_REGION }}

@@ -1,29 +1,22 @@
-import boto3
 import os
+import hashlib
 import pymysql
 
-ssm = boto3.client("ssm")
-
-ADMIN_TOKEN_PARAMETER = os.environ["ADMIN_TOKEN_PARAMETER"]
 
 DB_HOST = os.environ["DB_HOST"]
 DB_PORT = int(os.environ["DB_PORT"])
 DB_NAME = os.environ["DB_NAME"]
-DB_USERNAME_PARAMETER = os.environ["DB_USERNAME_PARAMETER"]
-DB_PASSWORD_PARAMETER = os.environ["DB_PASSWORD_PARAMETER"]
-
-
-def get_parameter(parameter_name):
-    response = ssm.get_parameter(
-        Name=parameter_name,
-        WithDecryption=True
-    )
-    return response["Parameter"]["Value"]
 
 
 def get_customer_by_token(customer_token):
-    username = get_parameter(DB_USERNAME_PARAMETER)
-    password = get_parameter(DB_PASSWORD_PARAMETER)
+
+    customer_token_hash = hashlib.sha256(
+        customer_token.encode("utf-8")
+    ).hexdigest()
+
+    username = os.environ["DB_USERNAME"]
+    password = os.environ["DB_PASSWORD"]
+    admin_token = os.environ["ADMIN_TOKEN"]
 
     connection = pymysql.connect(
         host=DB_HOST,
@@ -44,7 +37,7 @@ def get_customer_by_token(customer_token):
                 WHERE customer_token = %s
                 LIMIT 1
                 """,
-                (customer_token,)
+                (customer_token_hash,)
             )
 
             return cursor.fetchone()
@@ -85,6 +78,7 @@ def generate_policy(principal_id, effect, resource, role=None, customer_id=None)
 def lambda_handler(event, context):
 
     method_arn = event.get("methodArn", "*")
+    print(f"Method ARN: {method_arn}")
 
     arn_parts = method_arn.split("/")
 
@@ -107,7 +101,7 @@ def lambda_handler(event, context):
         provided_token = provided_token[7:].strip()
 
     try:
-        admin_token = get_parameter(ADMIN_TOKEN_PARAMETER)
+        admin_token = os.environ["ADMIN_TOKEN"]
 
         if provided_token == admin_token:
             print("Admin authenticated")
@@ -127,6 +121,35 @@ def lambda_handler(event, context):
             print(
                 f"Customer authenticated: customer_id={customer_id}"
             )
+
+            # Get the HTTP method and path from the API Gateway method ARN
+            if len(arn_parts) >= 4:
+                request_method = arn_parts[2]
+                request_path = "/" + "/".join(arn_parts[3:])
+            else:
+                request_method = ""
+                request_path = ""
+
+            # Customers cannot create, update, or delete products
+            request_method = event.get("httpMethod", request_method)
+            request_path = event.get("path", request_path)
+
+            if (
+                (request_path.rstrip("/") == "/products"
+                 and request_method == "POST")
+                or
+                (request_path.startswith("/products/")
+                 and request_method in ["PUT", "DELETE"])
+            ):
+                print("Customer is not authorized for product modification")
+
+                return generate_policy(
+                    f"cloudmart-customer-{customer_id}",
+                    "Deny",
+                    method_arn,
+                    "CUSTOMER",
+                    customer_id
+                )
 
             return generate_policy(
                 f"cloudmart-customer-{customer_id}",
